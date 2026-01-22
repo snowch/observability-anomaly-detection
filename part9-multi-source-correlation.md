@@ -478,85 +478,99 @@ config_embedding = EmbeddingRecord(
 Here's how to set up a multi-source vector index using Pinecone:
 
 ```{code-cell} ipython3
-import pinecone
-from pinecone import Pinecone, ServerlessSpec
+try:
+    import pinecone
+    from pinecone import Pinecone, ServerlessSpec
+    PINECONE_AVAILABLE = True
+except ImportError:
+    PINECONE_AVAILABLE = False
+    print("Pinecone not installed. Install with: pip install pinecone-client")
+    print("Skipping Pinecone vector DB example.")
 
-# Initialize Pinecone
-pc = Pinecone(api_key="your-api-key")
+if PINECONE_AVAILABLE:
+    # Initialize Pinecone
+    pc = Pinecone(api_key="your-api-key")
 
-# Create a single index for all sources
-index_name = "observability-embeddings"
+    # Create a single index for all sources
+    index_name = "observability-embeddings"
 
-# Check if index exists, create if not
-if index_name not in pc.list_indexes().names():
-    pc.create_index(
-        name=index_name,
-        dimension=64,  # Match our embedding dimension
-        metric='cosine',  # Cosine similarity for normalized embeddings
-        spec=ServerlessSpec(
-            cloud='aws',
-            region='us-east-1'
+    # Check if index exists, create if not
+    if index_name not in pc.list_indexes().names():
+        pc.create_index(
+            name=index_name,
+            dimension=64,  # Match our embedding dimension
+            metric='cosine',  # Cosine similarity for normalized embeddings
+            spec=ServerlessSpec(
+                cloud='aws',
+                region='us-east-1'
+            )
         )
-    )
 
-index = pc.Index(index_name)
+    index = pc.Index(index_name)
 
-# Upsert embeddings with metadata
-def store_embedding(record: EmbeddingRecord, record_id: str):
-    """Store an embedding record in the vector DB."""
-    index.upsert(vectors=[{
-        'id': record_id,
-        'values': record.embedding,
-        'metadata': {
-            'timestamp': record.timestamp.isoformat(),
-            'source_type': record.source_type,
-            'service': record.service,
-            'environment': record.environment,
-            **record.metadata  # Merge source-specific metadata
-        }
-    }])
+    # Upsert embeddings with metadata
+    def store_embedding(record: EmbeddingRecord, record_id: str):
+        """Store an embedding record in the vector DB."""
+        index.upsert(vectors=[{
+            'id': record_id,
+            'values': record.embedding,
+            'metadata': {
+                'timestamp': record.timestamp.isoformat(),
+                'source_type': record.source_type,
+                'service': record.service,
+                'environment': record.environment,
+                **record.metadata  # Merge source-specific metadata
+            }
+        }])
 
-# Example: Store embeddings from all sources
-store_embedding(metric_embedding, 'metric_001')
-store_embedding(trace_embedding, 'trace_001')
-store_embedding(config_embedding, 'config_001')
+    # Example: Store embeddings from all sources
+    store_embedding(metric_embedding, 'metric_001')
+    store_embedding(trace_embedding, 'trace_001')
+    store_embedding(config_embedding, 'config_001')
 
-print(f"Stored embeddings in unified vector DB: {index_name}")
-print(f"Total vectors: {index.describe_index_stats()['total_vector_count']}")
+    print(f"Stored embeddings in unified vector DB: {index_name}")
+    print(f"Total vectors: {index.describe_index_stats()['total_vector_count']}")
 ```
 
 **Alternative: Using Milvus** (open-source option):
 
 ```{code-cell} ipython3
-from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType
+try:
+    from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType
+    MILVUS_AVAILABLE = True
+except ImportError:
+    MILVUS_AVAILABLE = False
+    print("PyMilvus not installed. Install with: pip install pymilvus")
+    print("Skipping Milvus vector DB example.")
 
-# Connect to Milvus
-connections.connect(host='localhost', port='19530')
+if MILVUS_AVAILABLE:
+    # Connect to Milvus
+    connections.connect(host='localhost', port='19530')
 
-# Define schema with metadata fields
-fields = [
-    FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
-    FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=64),
-    FieldSchema(name="timestamp", dtype=DataType.VARCHAR, max_length=50),
-    FieldSchema(name="source_type", dtype=DataType.VARCHAR, max_length=20),
-    FieldSchema(name="service", dtype=DataType.VARCHAR, max_length=50),
-    FieldSchema(name="environment", dtype=DataType.VARCHAR, max_length=20),
-]
+    # Define schema with metadata fields
+    fields = [
+        FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
+        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=64),
+        FieldSchema(name="timestamp", dtype=DataType.VARCHAR, max_length=50),
+        FieldSchema(name="source_type", dtype=DataType.VARCHAR, max_length=20),
+        FieldSchema(name="service", dtype=DataType.VARCHAR, max_length=50),
+        FieldSchema(name="environment", dtype=DataType.VARCHAR, max_length=20),
+    ]
 
-schema = CollectionSchema(fields, description="Multi-source observability embeddings")
-collection = Collection(name="observability_embeddings", schema=schema)
+    schema = CollectionSchema(fields, description="Multi-source observability embeddings")
+    collection = Collection(name="observability_embeddings", schema=schema)
 
-# Create index on embedding field
-collection.create_index(
-    field_name="embedding",
-    index_params={
-        "metric_type": "IP",  # Inner product (for normalized vectors)
-        "index_type": "IVF_FLAT",
-        "params": {"nlist": 128}
-    }
-)
+    # Create index on embedding field
+    collection.create_index(
+        field_name="embedding",
+        index_params={
+            "metric_type": "IP",  # Inner product (for normalized vectors)
+            "index_type": "IVF_FLAT",
+            "params": {"nlist": 128}
+        }
+    )
 
-print(f"Milvus collection created: {collection.name}")
+    print(f"Milvus collection created: {collection.name}")
 ```
 
 **Key design decision**: Use a **single collection** for all sources, not separate collections. This enables:

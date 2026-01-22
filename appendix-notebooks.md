@@ -29,7 +29,7 @@ kernelspec:
 
 Pre-generated OCSF data (~3 hours of synthetic observability events):
 
-{download}`Download sample data (ocsf_data.zip) <./data.zip>`
+Sample data files are in the [`data/`](https://github.com/snowch/observability-anomaly-detection/tree/main/data) directory.
 
 **Contents:**
 - `ocsf_logs.parquet` - ~27,000 application log events (59 columns)
@@ -57,7 +57,7 @@ View the executed notebooks with output, or download to run yourself:
 | [Model Inference](notebooks/05-model-inference) | Load trained model and generate embeddings for new data | Part 4 output |
 | [Anomaly Detection](notebooks/06-anomaly-detection) | Compare k-NN, LOF, Isolation Forest detection | Part 4 output |
 
-{download}`Download all notebooks (notebooks.zip) <./notebooks.zip>`
+Notebook source files are in the [`notebooks/`](https://github.com/snowch/observability-anomaly-detection/tree/main/notebooks) directory.
 
 ---
 
@@ -120,7 +120,7 @@ graph LR
 
 ## What Each Notebook Covers
 
-### 03-feature-engineering.ipynb
+### 03-feature-engineering.md
 
 **Goal**: Transform raw OCSF data into feature arrays for TabularResNet.
 
@@ -136,7 +136,7 @@ graph LR
 
 ---
 
-### 04-self-supervised-training.ipynb
+### 04-self-supervised-training.md
 
 **Goal**: Train embeddings on unlabeled OCSF data using contrastive learning.
 
@@ -152,7 +152,7 @@ graph LR
 
 ---
 
-### 05-embedding-evaluation.ipynb
+### 05-embedding-evaluation.md
 
 **Goal**: Evaluate embedding quality before using them for anomaly detection.
 
@@ -168,7 +168,7 @@ graph LR
 
 ---
 
-### 05-model-inference.ipynb
+### 05-model-inference.md
 
 **Goal**: Load the trained model and generate embeddings for new OCSF data.
 
@@ -183,7 +183,7 @@ graph LR
 
 ---
 
-### 06-anomaly-detection.ipynb
+### 06-anomaly-detection.md
 
 **Goal**: Detect anomalies using multiple algorithms and compare performance.
 
