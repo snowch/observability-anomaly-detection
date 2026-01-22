@@ -1707,22 +1707,11 @@ For near real-time RCA, use streaming infrastructure:
 
 ```{code-cell} ipython3
 # Example: Kafka consumer for real-time embedding generation
-try:
-    from kafka import KafkaConsumer
-    KAFKA_AVAILABLE = True
-except ImportError:
-    KAFKA_AVAILABLE = False
-    print("kafka-python not installed. Install with: pip install kafka-python")
-    print("Skipping Kafka streaming example.")
-
+from kafka import KafkaConsumer
 import json
 
 def process_observability_stream():
     """Process observability events in real-time."""
-    if not KAFKA_AVAILABLE:
-        print("Kafka not available")
-        return
-
     consumer = KafkaConsumer(
         'observability-events',
         bootstrap_servers=['localhost:9092'],
@@ -1753,7 +1742,7 @@ def process_observability_stream():
             # Trigger correlation analysis
             trigger_rca_analysis(event, embedding, score)
 
-print("process_observability_stream() defined (requires Kafka)")
+print("process_observability_stream() defined")
 ```
 
 ---

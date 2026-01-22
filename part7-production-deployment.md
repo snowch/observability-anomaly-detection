@@ -499,14 +499,7 @@ print("Usage: router = ABTestRouter(champion, challenger, traffic_split=0.1)")
 ### Real-Time Inference (Streaming)
 
 ```{code-cell}
-try:
-    from kafka import KafkaConsumer, KafkaProducer
-    KAFKA_AVAILABLE = True
-except ImportError:
-    KAFKA_AVAILABLE = False
-    print("kafka-python not installed. Install with: pip install kafka-python")
-    print("Skipping Kafka streaming example.")
-
+from kafka import KafkaConsumer, KafkaProducer
 import json
 
 class StreamingAnomalyDetector:
@@ -585,9 +578,8 @@ def preprocess_ocsf(record):
     # Implementation depends on your schema
     pass
 
-if KAFKA_AVAILABLE:
-    print("StreamingAnomalyDetector class defined")
-    print("Usage: detector = StreamingAnomalyDetector(model, vector_db, brokers, 'ocsf-input', 'anomaly-alerts')")
+print("StreamingAnomalyDetector class defined")
+print("Usage: detector = StreamingAnomalyDetector(model, vector_db, brokers, 'ocsf-input', 'anomaly-alerts')")
 ```
 
 ### Batch Inference

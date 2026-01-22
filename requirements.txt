@@ -12,6 +12,9 @@ mlflow
 # FAISS for vector similarity search (Part 9)
 faiss-cpu
 
+# Kafka for streaming examples (Part 7, Part 9)
+kafka-python
+
 # Jupyter dependencies for code-cell execution
 jupyter
 ipykernel
