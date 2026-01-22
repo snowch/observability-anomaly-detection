@@ -626,10 +626,10 @@ def detect_anomalies_per_source(index, source_type, time_window_hours=1, k=10, t
     return anomalies
 
 # Detect anomalies in each source
-metric_anomalies = detect_anomalies_per_source(index, 'metrics')
-trace_anomalies = detect_anomalies_per_source(index, 'traces')
-log_anomalies = detect_anomalies_per_source(index, 'logs')
-config_anomalies = detect_anomalies_per_source(index, 'config')
+metric_anomalies = detect_anomalies_per_source(vector_db, 'metrics')
+trace_anomalies = detect_anomalies_per_source(vector_db, 'traces')
+log_anomalies = detect_anomalies_per_source(vector_db, 'logs')
+config_anomalies = detect_anomalies_per_source(vector_db, 'config')
 
 print(f"Detected anomalies:")
 print(f"  Metrics: {len(metric_anomalies)}")
@@ -1707,11 +1707,22 @@ For near real-time RCA, use streaming infrastructure:
 
 ```{code-cell} ipython3
 # Example: Kafka consumer for real-time embedding generation
-from kafka import KafkaConsumer
+try:
+    from kafka import KafkaConsumer
+    KAFKA_AVAILABLE = True
+except ImportError:
+    KAFKA_AVAILABLE = False
+    print("kafka-python not installed. Install with: pip install kafka-python")
+    print("Skipping Kafka streaming example.")
+
 import json
 
 def process_observability_stream():
     """Process observability events in real-time."""
+    if not KAFKA_AVAILABLE:
+        print("Kafka not available")
+        return
+
     consumer = KafkaConsumer(
         'observability-events',
         bootstrap_servers=['localhost:9092'],
@@ -1741,6 +1752,8 @@ def process_observability_stream():
         if is_anomaly:
             # Trigger correlation analysis
             trigger_rca_analysis(event, embedding, score)
+
+print("process_observability_stream() defined (requires Kafka)")
 ```
 
 ---
