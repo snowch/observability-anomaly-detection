@@ -453,7 +453,7 @@ def train_epoch(model, dataloader, optimizer, cardinalities, augmenter, device):
 
 ```{code-cell}
 # Training configuration
-num_epochs = 35
+num_epochs = 80
 learning_rate = 1e-3
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
