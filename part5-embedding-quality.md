@@ -575,10 +575,18 @@ plt.show()
 ```
 
 **Reading the silhouette plot**:
-1. **Red dashed line** (average): Your overall Silhouette Score—should be > 0.5 for production
-2. **Width of each colored band**: Per-sample scores—wide spread indicates outliers in cluster
-3. **Points below zero**: These samples are probably in the wrong cluster
-4. **Uneven cluster widths**: Check if one cluster dominates (might be anomalies or model collapse)
+
+1. **Red dashed line** (average): Your overall Silhouette Score
+   - **Why > 0.5 for production?** Remember that silhouette ranges from -1 to +1. A score of 0.5 means each sample is, on average, twice as close to its own cluster as to the nearest other cluster. Below 0.5, clusters start to blur together—your model may confuse similar event types. In security monitoring, misclassifying a DNS exfiltration event as normal traffic is costly.
+
+2. **Width of each colored band**: Per-sample scores within that cluster
+   - **What is "wide"?** If the horizontal bars for a cluster span more than 0.3 units (e.g., some samples at 0.2 and others at 0.8), you have inconsistent embeddings. A tight cluster would have all samples within ~0.1 of each other. Wide spread often means your cluster contains semantically different events that were grouped together.
+
+3. **Points below zero**: These samples are closer to a *different* cluster than their assigned one
+   - **Why is this bad?** A negative silhouette (b < a) literally means the sample's average distance to the nearest other cluster (b) is smaller than its average distance to its own cluster (a). The math says: "this point is in the wrong place." These are either mislabeled, edge cases, or indicate your embedding model treats them differently than expected.
+
+4. **Uneven cluster sizes**: If one cluster has 500 samples and another has 50, investigate
+   - This might be fine (rare attack types vs. common auth events), or it might indicate model collapse where diverse events get lumped together. Cross-reference with your actual OCSF event type distribution.
 
 #### Davies-Bouldin Index
 
