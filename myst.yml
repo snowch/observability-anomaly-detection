@@ -1,0 +1,68 @@
+# See docs at: https://mystmd.org/guide/frontmatter
+version: 1
+project:
+  id: observability-anomaly-detection
+  title: Embedding-Based Anomaly Detection for Observability
+  description: A comprehensive tutorial series on building production-ready anomaly detection systems using ResNet embeddings for OCSF observability data
+  keywords:
+    - anomaly detection
+    - embeddings
+    - ResNet
+    - OCSF
+    - observability
+    - machine learning
+    - deep learning
+    - self-supervised learning
+  authors:
+    - name: Chris Snow
+      url: https://snowch.github.io
+  github: https://github.com/snowch/observability-anomaly-detection
+  license: CC-BY-4.0
+  bibliography:
+    - references.bib
+  toc:
+    - file: index.md
+      title: Series Introduction
+    - file: part1-understanding-resnet.md
+      title: "Part 1: Understanding ResNet Architecture"
+    - file: part2-tabular-resnet.md
+      title: "Part 2: Adapting ResNet for Tabular Data"
+    - file: part3-feature-engineering.md
+      title: "Part 3: Feature Engineering for OCSF Data"
+    - file: part4-self-supervised-training.md
+      title: "Part 4: Self-Supervised Training"
+    - file: part5-embedding-quality.md
+      title: "Part 5: Evaluating Embedding Quality"
+    - file: part6-anomaly-detection.md
+      title: "Part 6: Anomaly Detection Methods"
+    - file: part7-production-deployment.md
+      title: "Part 7: Production Deployment"
+    - file: part8-production-monitoring.md
+      title: "Part 8: Production Monitoring"
+    - file: part9-multi-source-correlation.md
+      title: "Part 9: Multi-Source Event Correlation"
+    - file: appendix-generating-training-data.md
+      title: "Appendix: Generating Training Data"
+    - file: appendix-notebooks.md
+      title: "Appendix: Notebooks & Sample Data"
+    - file: notebooks/03-feature-engineering.md
+      title: "Notebook: Feature Engineering"
+    - file: notebooks/04-self-supervised-training.md
+      title: "Notebook: Self-Supervised Training"
+    - file: notebooks/05-embedding-evaluation.md
+      title: "Notebook: Embedding Evaluation"
+    - file: notebooks/05-model-inference.md
+      title: "Notebook: Model Inference"
+    - file: notebooks/06-anomaly-detection.md
+      title: "Notebook: Anomaly Detection"
+ 
+site:
+  template: book-theme
+  title: Observability Anomaly Detection
+  options:
+    logo_text: Observability Anomaly Detection
+  nav:
+    - title: GitHub
+      url: https://github.com/snowch/observability-anomaly-detection
+    - title: Author
+      url: https://snowch.github.io
