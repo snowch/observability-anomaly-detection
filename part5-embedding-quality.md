@@ -236,9 +236,16 @@ def visualize_embeddings_umap(embeddings, labels=None, title="Embedding Space (U
     plt.tight_layout()
     return fig
 
-print("UMAP visualization function defined")
-print("Usage: visualize_embeddings_umap(embeddings, labels)")
+# Run UMAP on the same simulated data
+fig = visualize_embeddings_umap(all_embeddings, labels, title="OCSF Embeddings (UMAP)")
+if fig is not None:
+    plt.show()
+    print("✓ UMAP visualization complete")
+    print("  - Compare with t-SNE above: UMAP preserves global distances better")
+    print("  - Clusters should appear in similar positions but with different shapes")
 ```
+
+**Comparing t-SNE vs UMAP on the same data**: Notice how UMAP tends to preserve the relative distances between clusters better than t-SNE. If Cluster A and Cluster B are far apart in the original 256-dim space, UMAP will keep them far apart in 2D. t-SNE may distort these global distances while preserving local neighborhoods.
 
 #### Choosing Between t-SNE and UMAP
 
