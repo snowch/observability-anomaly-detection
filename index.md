@@ -276,7 +276,7 @@ Load trained model and generate embeddings:
 - Run inference on new data
 - Extract embedding vectors
 
-**Hands-on** · Inference
+**Hands-on** · Part 5
 :::
 
 :::{grid-item-card} Notebook: Anomaly Detection
