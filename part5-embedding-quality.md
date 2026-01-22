@@ -443,11 +443,37 @@ Now we move from subjective "looking" to objective scoring. These metrics give y
 
 Three complementary metrics measure how well your embeddings form distinct clusters:
 
-<!-- [Image: Visual explanation of Silhouette Score showing intra-cluster distance (a) vs inter-cluster distance (b) for a single point] -->
-
 #### Silhouette Score
 
 **What it measures**: How similar each point is to its own cluster (cohesion) vs other clusters (separation).
+
+**Visual intuition**:
+
+```
+        Cluster A                    Cluster B
+      ┌─────────────┐              ┌─────────────┐
+      │   o   o     │              │     x   x   │
+      │  o  ●  o    │ ──── b ────► │   x   x     │
+      │   o   o     │              │     x   x   │
+      └─────────────┘              └─────────────┘
+           │
+           │ a = avg distance to
+           │     points in same cluster
+           ▼
+        (small a = tight cluster = GOOD)
+
+    ● = the point we're measuring
+    o = other points in same cluster (used to compute 'a')
+    x = points in nearest other cluster (used to compute 'b')
+
+    Silhouette = (b - a) / max(a, b)
+
+    If b >> a: point is well-placed → score near +1 (GOOD)
+    If a >> b: point is misplaced  → score near -1 (BAD)
+    If a ≈ b:  point is on boundary → score near 0
+```
+
+**Memory aid**: "**S**ilhouette = **S**eparation minus cohesion". High score means your point is **far from other clusters** (high b) and **close to its own cluster** (low a).
 
 **Range**: -1 to +1
 
