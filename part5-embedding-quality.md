@@ -380,6 +380,43 @@ print("✗ Bad: If record 4 (failure) appeared as top neighbor, model confused s
    - ✅ Good: User A's logins are neighbors with each other, not User B's
    - ❌ Bad: All users look identical
 
+#### Handling High-Dimensional Records
+
+Real OCSF records often have dozens of fields, making visual comparison difficult. Strategies to make inspection tractable:
+
+**1. Focus on key fields**: Define a small set of "critical fields" for your use case:
+```python
+CRITICAL_FIELDS = ['activity_id', 'status', 'user_id', 'severity']
+
+def summarize_record(record):
+    """Extract only the fields that matter for comparison."""
+    return {k: record.get(k) for k in CRITICAL_FIELDS if k in record}
+```
+
+**2. Compute field-level agreement**: Instead of eyeballing, quantify how many key fields match:
+```python
+def field_agreement(query, neighbor, fields=CRITICAL_FIELDS):
+    """Return fraction of critical fields that match."""
+    matches = sum(1 for f in fields if query.get(f) == neighbor.get(f))
+    return matches / len(fields)
+```
+
+**3. Flag semantic violations**: Automatically detect when neighbors violate critical distinctions:
+```python
+def check_semantic_violations(query, neighbors):
+    """Flag neighbors that differ on critical security fields."""
+    violations = []
+    for neighbor in neighbors:
+        if query['status'] != neighbor['status']:  # e.g., success vs failure
+            violations.append(f"Status mismatch: {query['status']} vs {neighbor['status']}")
+    return violations
+```
+
+**4. Sample strategically**: Don't just pick random queries—test edge cases:
+- One sample from each cluster
+- Known anomalies (do their neighbors look anomalous?)
+- Boundary cases (records near cluster edges)
+
 #### Common Failures Caught by Neighbor Inspection
 
 - Model treats all failed login attempts as identical (ignores failed password vs account locked)
