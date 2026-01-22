@@ -216,6 +216,39 @@ Install with:
 pip install pandas numpy torch scikit-learn matplotlib pyarrow
 ```
 
+### Converting MyST Markdown to Jupyter Notebooks
+
+The notebooks in this repository are written in [MyST Markdown](https://mystmd.org/) format (`.md` files with executable code cells). To convert them to standard Jupyter notebooks (`.ipynb`):
+
+**Option 1: Using jupytext (recommended)**
+
+```bash
+# Install jupytext
+pip install jupytext
+
+# Convert a single notebook
+jupytext --to ipynb notebooks/03-feature-engineering.md
+
+# Convert all notebooks
+jupytext --to ipynb notebooks/*.md
+```
+
+**Option 2: Using MyST CLI**
+
+```bash
+# Install mystmd
+npm install -g mystmd
+
+# Build notebooks (creates .ipynb in _build/)
+myst build --execute
+```
+
+**Why MyST Markdown?**
+- Version control friendly (clean diffs)
+- Renders directly on GitHub
+- Supports rich content (admonitions, cross-references, citations)
+- Executes during site build for always-fresh output
+
 ### Alternative: Run with Docker
 
 Don't want to install Python locally? Use the official PyTorch Jupyter image:
