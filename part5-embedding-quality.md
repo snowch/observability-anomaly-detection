@@ -156,6 +156,21 @@ print("  - Look for clear cluster separation")
 print("  - Anomalies should be outliers or in sparse regions")
 ```
 
+**Interpreting this visualization**: This example uses simulated data with a fixed random seed, so you'll always see the same pattern:
+
+- **Classes 0, 1, 2** (blue, red, pink): Three distinct clusters representing different "normal" event types. In real OCSF data, these might be successful logins, file access events, and network connections.
+- **Class 3** (cyan): Scattered points representing anomalies. Notice they're more dispersed and positioned away from the tight normal clusters.
+
+**What this demonstrates**:
+- Good embeddings produce **tight, well-separated clusters** for normal behavior
+- Anomalies appear as **outliers** or in **sparse regions** between clusters
+- The clear separation here is idealized—real embeddings will have more overlap
+
+**When analyzing your own embeddings**, ask:
+1. Do you see distinct clusters? (If not, embeddings may not have learned meaningful structure)
+2. Are the clusters interpretable? (Can you map them to event types?)
+3. Where are your known anomalies? (They should be outliers, not mixed into normal clusters)
+
 #### UMAP: Focus on Global Structure
 
 **What is UMAP?** Uniform Manifold Approximation and Projection preserves both local and global structure better than t-SNE. Generally faster and more scalable.
