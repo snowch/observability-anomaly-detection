@@ -15,91 +15,57 @@ bibliography:
 
 Learn how to evaluate and validate the quality of learned embeddings before deploying to production.
 
-## Why Evaluate Embeddings?
+## 1. Introduction: The Quality Gap
 
 After training your TabularResNet using self-supervised learning ([Part 4](part4-self-supervised-training)), you need to verify that the embeddings are actually useful before deploying to production.
 
-**The challenge**: Just because your training loss decreased doesn't mean your embeddings are good. A model can memorize training data while learning useless representations that fail on real anomaly detection.
+### The Problem
 
-**The solution**: Evaluate embeddings from multiple angles using both quantitative metrics and qualitative inspection. This catches issues that any single metric would miss.
+Just because your training loss decreased doesn't mean your embeddings are good. A model can memorize training data while learning useless representations that fail on real anomaly detection.
 
-**What makes good embeddings?**
-1. **Meaningful**: Similar OCSF records (e.g., login events from same user) have similar embeddings
-2. **Discriminative**: Different event types (e.g., successful login vs failed login) are separated in embedding space
-3. **Robust**: Small noise in input features (±5% in bytes, slight time jitter) doesn't drastically change embeddings
-4. **Useful**: Enable effective anomaly detection downstream ([Part 6](part6-anomaly-detection))
+### The Goal
+
+Good embeddings must be:
+- **Meaningful**: Similar OCSF records (e.g., login events from same user) have similar embeddings
+- **Discriminative**: Different event types (e.g., successful login vs failed login) are separated in embedding space
+- **Robust**: Small noise in input features (±5% in bytes, slight time jitter) doesn't drastically change embeddings
+- **Useful**: Enable effective anomaly detection downstream ([Part 6](part6-anomaly-detection))
+
+### The Approach
+
+We evaluate embeddings using a two-pronged strategy that follows the data science workflow:
+
+| Phase | Focus | Methods |
+|-------|-------|---------|
+| **Phase 1: Qualitative** | Visual inspection | t-SNE, UMAP, Nearest Neighbors |
+| **Phase 2: Quantitative** | Structural measurement | Silhouette, Davies-Bouldin, Calinski-Harabasz |
+| **Phase 3: Robustness** | Stress testing | Perturbation stability, k-NN classification, Model comparison |
+| **Phase 4: Operational** | Production readiness | Latency, Memory, Cost trade-offs |
 
 **Why this matters for observability data**: Poor embeddings make anomaly detection fail silently. If your model thinks failed logins look similar to successful logins, it won't catch account takeover attacks. Evaluation catches these problems early.
 
----
-
-## Evaluation Framework: Two-Pronged Approach
-
-Evaluating embedding models requires combining **Quantitative Evaluation** (standardized metrics) and **Qualitative Evaluation** (manual inspection and visualization).
-
-**Why both?** Numbers don't tell the whole story. A model might have a high Silhouette Score but still confuse critical security events. You need to *look* at the data to catch these semantic failures.
-
-### Quantitative Evaluation (Automated Metrics)
-
-Use these when you need objective, comparable numbers:
-
-1. **Cluster Quality Metrics**:
-   - **Silhouette Score**: Measures how well-separated clusters are (range: -1 to +1, higher is better)
-   - **Davies-Bouldin Index**: Measures cluster separation (lower is better, minimum 0)
-   - **Calinski-Harabasz Score**: Ratio of between-cluster to within-cluster variance (higher is better)
-
-2. **Downstream Task Performance**:
-   - **k-NN Classification Accuracy**: If you have some labeled data, use k-NN as a proxy for how useful embeddings are
-   - **Anomaly Detection F1**: Test on actual anomaly detection task (covered in Part 6)
-
-3. **Robustness Metrics**:
-   - **Perturbation Stability**: Cosine similarity between original and slightly perturbed embeddings (should be > 0.90)
-
-4. **Operational Metrics**:
-   - **Inference Latency**: Time to embed a single OCSF record (critical for real-time systems)
-   - **Memory Footprint**: Storage required per embedding in your vector database
-   - **Embedding Dimensions vs Performance**: Does reducing d_model from 512 → 256 hurt quality?
-
-### Qualitative Evaluation (Manual Inspection)
-
-Use these to catch issues that metrics miss:
-
-1. **Visualization** (t-SNE, UMAP):
-   - Project 256-dim embeddings → 2D scatter plots
-   - **What to look for**: Distinct clusters for different event types, outliers for anomalies
-   - **Red flags**: All points overlapping in a blob, no visual separation between classes
-
-2. **Nearest Neighbor Inspection**:
-   - Pick a sample OCSF record, find its 10 closest neighbors in embedding space
-   - **What to check**: Are neighbors actually similar events? Does model confuse critical differences (e.g., success vs failure)?
-   - **Red flags**: Neighbors are random unrelated events, model treats all login attempts as identical
-
-3. **Semantic Failure Detection**:
-   - Manually test edge cases: Does model distinguish brute force attempts from normal logins?
-   - **Example**: If embeddings for "100 failed logins in 1 minute" are similar to "1 successful login", that's a failure
-
-**Key terminology**:
-- **t-SNE** (t-Distributed Stochastic Neighbor Embedding): Reduces high-dimensional embeddings to 2D while preserving local structure. Good for visualization but can distort global relationships.
-- **UMAP** (Uniform Manifold Approximation and Projection): Similar to t-SNE but better preserves global structure. Generally faster and more scalable.
-- **Perplexity**: A t-SNE parameter that balances attention between local and global aspects (think of it as "expected number of neighbors"). Typical values: 5-50.
-- **Silhouette Score**: Measures how similar a point is to its own cluster vs other clusters. Range: -1 to +1 (higher is better).
-- **Davies-Bouldin Index**: Measures average similarity between each cluster and its most similar one. Lower values indicate better separation.
-- **Cosine Similarity**: Measures the angle between two embedding vectors (range: -1 to +1). Values close to 1 mean vectors point in same direction (similar records).
+<!-- [Image: Flowchart showing the four evaluation phases as a pipeline: Inspect → Measure → Stress Test → Operationalize, with decision gates between each phase] -->
 
 ---
 
-## 1. Embedding Space Visualization (Qualitative)
+## 2. Phase 1: Qualitative Inspection (The "Eye Test")
 
-**Why visualization matters**: Even with perfect metrics, you need to *see* your embedding space to catch semantic failures. A t-SNE plot showing failed logins mixed with successful logins immediately tells you something is wrong, even if the Silhouette Score looks good.
+Before calculating metrics, visualize the high-dimensional space to catch obvious semantic failures. Numbers don't tell the whole story—a model might have a high Silhouette Score but still confuse critical security events.
 
 **The goal**: Project high-dimensional embeddings (e.g., 256-dim) → 2D scatter plot where you can visually inspect:
 - Do similar OCSF events cluster together?
 - Are different event types clearly separated?
 - Do anomalies appear as outliers or in sparse regions?
 
-### t-SNE Visualization
+### 2.1 Dimensionality Reduction: t-SNE vs. UMAP
 
-**What is t-SNE?** A dimensionality reduction technique that preserves local structure. Similar points in 256-dim space stay close in 2D, different points stay far apart.
+Two techniques help us visualize high-dimensional embedding spaces in 2D:
+
+<!-- [Image: Side-by-side comparison of t-SNE and UMAP on the same dataset, highlighting how t-SNE emphasizes local clusters while UMAP preserves global distances] -->
+
+#### t-SNE: Focus on Local Structure
+
+**What is t-SNE?** t-Distributed Stochastic Neighbor Embedding reduces high-dimensional embeddings to 2D while preserving local structure. Similar points in 256-dim space stay close in 2D, different points stay far apart.
 
 **When to use t-SNE**:
 - Exploring your embedding space for the first time
@@ -111,13 +77,10 @@ Use these to catch issues that metrics miss:
 - Sensitive to hyperparameters (perplexity changes the plot dramatically)
 - Doesn't preserve exact distances (only neighborhood relationships)
 
-**What to look for in the plot**:
-- ✅ **Good**: Clear, distinct clusters for different event types with some separation
-- ✅ **Good**: Anomalies appear as scattered points far from clusters
-- ✅ **Good**: Within a cluster, points from same users/sources are close together
-- ❌ **Bad**: All points in one giant overlapping blob (no structure learned)
-- ❌ **Bad**: Random scatter with no clusters (embeddings are noise)
-- ❌ **Bad**: Successful and failed login events mixed together (critical security distinction lost)
+**Key parameter—Perplexity**: Balances attention between local and global aspects (think of it as "expected number of neighbors"):
+- **perplexity=5**: Focuses on very local structure (good for finding small clusters)
+- **perplexity=30**: Balanced view (default, good starting point)
+- **perplexity=50**: Emphasizes global structure (good for large datasets >10K samples)
 
 ```{code-cell}
 import logging
@@ -193,38 +156,9 @@ print("  - Look for clear cluster separation")
 print("  - Anomalies should be outliers or in sparse regions")
 ```
 
-**Interpreting your t-SNE plot**:
+#### UMAP: Focus on Global Structure
 
-1. **Cluster count**: How many distinct groups do you see?
-   - If you trained on OCSF authentication logs, you might see: successful logins (cluster 1), failed logins (cluster 2), suspicious login patterns (cluster 3)
-   - Too many tiny clusters (>10) might mean overfitting
-   - One giant blob means model didn't learn useful structure
-
-2. **Cluster separation**: Is there space between clusters?
-   - Clear gaps = model learned discriminative embeddings
-   - Overlapping boundaries = model confuses some event types
-   - Check the overlap region: are these ambiguous cases or critical security events being missed?
-
-3. **Outliers**: Do you see scattered points far from any cluster?
-   - These are potential anomalies! Export their indices and inspect the raw OCSF records
-   - Example: If a login attempt has 1000x more bytes than normal, it should appear as an outlier
-
-4. **Cluster density**: Are clusters tight or spread out?
-   - Tight clusters = consistent embeddings for similar events (good)
-   - Diffuse clusters = high variance within event type (might need more training)
-
-**Hyperparameter tuning**:
-- **perplexity=5**: Focuses on very local structure (good for finding small clusters)
-- **perplexity=30**: Balanced view (default, good starting point)
-- **perplexity=50**: Emphasizes global structure (good for large datasets >10K samples)
-
-Try multiple perplexity values - if your conclusions change dramatically, the structure might not be reliable.
-
----
-
-### UMAP Visualization
-
-**What is UMAP?** A newer dimensionality reduction technique that preserves both local and global structure better than t-SNE. Generally faster and more scalable.
+**What is UMAP?** Uniform Manifold Approximation and Projection preserves both local and global structure better than t-SNE. Generally faster and more scalable.
 
 **When to use UMAP instead of t-SNE**:
 - You have >10K samples (UMAP is faster)
@@ -235,10 +169,6 @@ Try multiple perplexity values - if your conclusions change dramatically, the st
 - **Global structure**: Distances between clusters in UMAP are more meaningful
 - **Speed**: UMAP can handle 100K+ samples that would make t-SNE crash
 - **Reproducibility**: UMAP plots are more consistent across runs
-
-**What to look for**:
-- Same as t-SNE: clear clusters, separated event types, outliers for anomalies
-- Additionally: cluster distances in 2D roughly reflect distances in 256-dim space
 
 ```{code-cell}
 # Note: UMAP requires installation: pip install umap-learn
@@ -295,7 +225,7 @@ print("UMAP visualization function defined")
 print("Usage: visualize_embeddings_umap(embeddings, labels)")
 ```
 
-**When to use which?**
+#### Choosing Between t-SNE and UMAP
 
 | Method | Best For | Preserves | Speed |
 |--------|----------|-----------|-------|
@@ -304,13 +234,33 @@ print("Usage: visualize_embeddings_umap(embeddings, labels)")
 
 **Recommendation**: Start with t-SNE for initial exploration (<5K samples). Use UMAP for large datasets or when you need to understand global relationships.
 
+#### Interpreting Your Visualization
+
+<!-- [Image: Annotated t-SNE plot showing examples of "good" patterns (well-separated clusters, outliers in sparse regions) vs "bad" patterns (blob, random scatter, mixed classes)] -->
+
+**What to look for**:
+- ✅ **Good**: Clear, distinct clusters for different event types with some separation
+- ✅ **Good**: Anomalies appear as scattered points far from clusters
+- ✅ **Good**: Within a cluster, points from same users/sources are close together
+- ❌ **Bad**: All points in one giant overlapping blob (no structure learned)
+- ❌ **Bad**: Random scatter with no clusters (embeddings are noise)
+- ❌ **Bad**: Successful and failed login events mixed together (critical security distinction lost)
+
+**Cluster interpretation questions**:
+1. **Cluster count**: How many distinct groups? Too many tiny clusters (>10) might mean overfitting.
+2. **Cluster separation**: Clear gaps = discriminative embeddings. Overlapping boundaries = confusion.
+3. **Outliers**: Scattered points far from clusters are potential anomalies—export and inspect them.
+4. **Cluster density**: Tight clusters = consistent embeddings (good). Diffuse = high variance (needs more training).
+
 ---
 
-### Nearest Neighbor Inspection
+### 2.2 Nearest Neighbor Inspection
 
-**Why this matters**: Visualization shows overall structure, but you need to zoom in and check if individual embeddings make sense. A model might create nice-looking clusters but still confuse critical security events.
+Visualization shows overall structure, but you need to zoom in and check if individual embeddings make sense. A model might create nice-looking clusters but still confuse critical security events.
 
 **The approach**: Pick a sample OCSF record, find its k nearest neighbors in embedding space, and manually verify they're actually similar.
+
+<!-- [Image: Diagram showing a query embedding with arrows pointing to its top-5 neighbors, with semantic labels showing whether neighbors are correctly similar] -->
 
 ```{code-cell}
 def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, k=10):
@@ -390,28 +340,29 @@ print("✓ Good: Record 4 is far (failed login should be different)")
 print("✗ Bad: If record 4 (failure) appeared as top neighbor, model confused success/failure")
 ```
 
-**What to check in your nearest neighbors**:
+#### What to Check in Nearest Neighbors
 
 1. **Same event type**: If query is a login, are neighbors also logins?
    - ✅ Good: Top 5 neighbors are all authentication events
-   - ❌ Bad: Neighbors include file access, network connections (model doesn't distinguish event types)
+   - ❌ Bad: Neighbors include file access, network connections
 
 2. **Similar critical fields**: For security data, check status, severity, user patterns
-   - ✅ Good: Successful login's neighbors are also successful (status preserved)
+   - ✅ Good: Successful login's neighbors are also successful
    - ❌ Bad: Successful and failed logins are neighbors (critical distinction lost!)
 
 3. **Similar numerical patterns**: Check if bytes, duration, counts are similar
    - ✅ Good: Login with 1KB data has neighbors with ~1KB (±20%)
-   - ❌ Bad: 1KB login neighbors a 1MB login (model ignores magnitude)
+   - ❌ Bad: 1KB login neighbors a 1MB login
 
-4. **Different users should be separated**: Unless behavior is identical
+4. **Different users should be separated** (unless behavior is identical)
    - ✅ Good: User A's logins are neighbors with each other, not User B's
-   - ❌ Bad: All users look identical (model can't distinguish user behavior)
+   - ❌ Bad: All users look identical
 
-**Common failures caught by neighbor inspection**:
+#### Common Failures Caught by Neighbor Inspection
+
 - Model treats all failed login attempts as identical (ignores failed password vs account locked)
-- Model groups events by timestamp instead of semantic meaning (everything at 9 AM looks similar)
-- Model confuses high-frequency normal events with brute force attempts (both have many events)
+- Model groups events by timestamp instead of semantic meaning
+- Model confuses high-frequency normal events with brute force attempts
 
 **Action items when neighbors look wrong**:
 - Review your feature engineering (Part 3): Are you encoding the right fields?
@@ -420,38 +371,41 @@ print("✗ Bad: If record 4 (failure) appeared as top neighbor, model confused s
 
 ---
 
-## 2. Cluster Quality Metrics (Quantitative)
+## 3. Phase 2: Cluster Quality Metrics (The Math)
 
-**Why cluster metrics matter**: Visualization is subjective - two people might disagree on whether clusters are "well-separated". Metrics give you objective numbers to track over time and compare models.
+Now we move from subjective "looking" to objective scoring. These metrics give you numbers to track over time and compare models.
 
 **When to use cluster metrics**:
 - Comparing multiple model configurations (ResNet-256 vs ResNet-512)
 - Tracking embedding quality during training (compute every 10 epochs)
 - Setting production deployment thresholds ("don't deploy if Silhouette < 0.5")
 
-### Silhouette Score
+### 3.1 Cohesion & Separation Metrics
 
-**What it measures**: How similar each point is to its own cluster (cohesion) vs other clusters (separation). Range: -1 to +1.
+Three complementary metrics measure how well your embeddings form distinct clusters:
 
-**Interpretation**:
-- **+1.0**: Perfect - point is right in the center of its cluster, far from others
-- **+0.7 to +1.0**: Strong structure - clusters are well-separated and cohesive
-- **+0.5 to +0.7**: Reasonable structure - acceptable for production
-- **+0.25 to +0.5**: Weak structure - clusters exist but with significant overlap
-- **0 to +0.25**: Barely any structure - model didn't learn much
-- **Negative**: Point is likely in the wrong cluster
+<!-- [Image: Visual explanation of Silhouette Score showing intra-cluster distance (a) vs inter-cluster distance (b) for a single point] -->
 
-**For OCSF security data**:
-- Target: Silhouette > 0.5 for production deployment
-- If you get 0.3-0.5: Model learned some structure but may miss subtle anomalies
-- If you get < 0.25: Embeddings are not useful, retrain with different approach
+#### Silhouette Score
+
+**What it measures**: How similar each point is to its own cluster (cohesion) vs other clusters (separation).
+
+**Range**: -1 to +1
+
+| Score | Interpretation | Action |
+|-------|----------------|--------|
+| +0.7 to +1.0 | Strong structure—clusters are well-separated and cohesive | Ready for production |
+| +0.5 to +0.7 | Reasonable structure—acceptable for production | Monitor edge cases |
+| +0.25 to +0.5 | Weak structure—clusters exist but with significant overlap | Consider retraining |
+| 0 to +0.25 | Barely any structure | Retrain with different approach |
+| Negative | Point is likely in wrong cluster | Clustering failed |
 
 **How it works**: For each point, compute:
 1. `a` = average distance to other points in same cluster (intra-cluster distance)
 2. `b` = average distance to points in nearest different cluster (inter-cluster distance)
 3. Silhouette = `(b - a) / max(a, b)`
 
-**Code interpretation**:
+**For OCSF security data**: Target Silhouette > 0.5 for production deployment.
 
 ```{code-cell}
 from sklearn.metrics import silhouette_score, silhouette_samples
@@ -529,53 +483,42 @@ plt.show()
 ```
 
 **Reading the silhouette plot**:
-
-1. **Red dashed line** (average): Your overall Silhouette Score
-   - Should be > 0.5 for production
-   - If < 0.3, clustering is weak
-
-2. **Width of each colored band**: Silhouette scores for samples in that cluster
-   - Wide spread (some negative, some >0.7) = cluster has outliers
-   - Narrow spread (all ~0.6) = consistent, cohesive cluster
-
+1. **Red dashed line** (average): Your overall Silhouette Score—should be > 0.5 for production
+2. **Width of each colored band**: Per-sample scores—wide spread indicates outliers in cluster
 3. **Points below zero**: These samples are probably in the wrong cluster
-   - If Cluster 0 has many negative points, it might contain mixed event types
-   - Export these samples and inspect manually
+4. **Uneven cluster widths**: Check if one cluster dominates (might be anomalies or model collapse)
 
-4. **Uneven cluster widths**: Check if one cluster dominates
-   - Example: Cluster 0 = 500 points, Cluster 1 = 20 points
-   - The tiny cluster might be anomalies (good!) or model collapsed (bad)
+#### Davies-Bouldin Index
 
-**Troubleshooting**:
-- **All negative values**: Clustering failed completely - try different n_clusters or retrain embeddings
-- **One huge cluster, rest tiny**: Model didn't learn discriminative features - check feature engineering
-- **Even sizes, low scores**: Model created arbitrary splits - embeddings lack semantic structure
+**What it measures**: Average similarity ratio between each cluster and its most similar neighbor. **Lower is better** (minimum 0).
 
----
-
-### Davies-Bouldin Index
-
-**What it measures**: Average similarity ratio between each cluster and its most similar neighbor. Lower is better (minimum 0).
-
-**Interpretation**:
-- **0 to 0.5**: Excellent separation - clusters are distinct and well-formed
-- **0.5 to 1.0**: Good separation - acceptable for most applications
-- **1.0 to 2.0**: Moderate separation - clusters overlap somewhat
-- **> 2.0**: Poor separation - clusters are not well-defined
+| Score | Interpretation |
+|-------|----------------|
+| 0 to 0.5 | Excellent separation |
+| 0.5 to 1.0 | Good separation—acceptable for production |
+| 1.0 to 2.0 | Moderate separation—clusters overlap somewhat |
+| > 2.0 | Poor separation |
 
 **How it works**:
 1. For each cluster, find its most similar other cluster
-2. Compute ratio: (avg distance within cluster A + avg distance within cluster B) / (distance between A and B centroids)
-3. Average this ratio across all clusters
+2. Compute ratio: (avg distance within A + avg distance within B) / (distance between A and B centroids)
+3. Average across all clusters
 
-**Why it complements Silhouette**:
-- Silhouette looks at individual samples
-- Davies-Bouldin looks at cluster-level separation
-- Both should agree - if Silhouette is high but DB is high too, investigate
+**Why it complements Silhouette**: Silhouette looks at individual samples; Davies-Bouldin looks at cluster-level separation.
 
-**For OCSF security data**:
-- Target: Davies-Bouldin < 1.0
-- If > 1.5: Clusters overlap significantly, anomaly detection may miss edge cases
+**For OCSF security data**: Target Davies-Bouldin < 1.0.
+
+#### Calinski-Harabasz Score
+
+**What it measures**: Ratio of between-cluster variance to within-cluster variance. **Higher is better** (no upper bound).
+
+Use for relative comparison between models—no fixed threshold.
+
+---
+
+### 3.2 Determining Optimal Clusters (k)
+
+How many natural groupings exist in your OCSF data? Use multiple metrics together to find the answer.
 
 ```{code-cell}
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
@@ -627,43 +570,43 @@ print("  - Davies-Bouldin: Lower is better (min 0.0)")
 print("  - Calinski-Harabasz: Higher is better (no upper bound)")
 ```
 
-**How to choose optimal k (number of clusters)**:
+**How to choose optimal k**:
 
 1. **Look for sweet spots**: Where multiple metrics agree
    - Example: k=5 has highest Silhouette (0.62) AND lowest Davies-Bouldin (0.75) → good choice
-   - If metrics disagree (k=3 best Silhouette, k=7 best DB), visualize both with t-SNE
 
 2. **Elbow method**: Look for k where metrics stop improving dramatically
-   - Silhouette increases: 0.3 (k=2) → 0.5 (k=3) → 0.52 (k=4) → 0.53 (k=5)
-   - Improvement slows after k=3, so k=3 or k=4 is reasonable
+   - Silhouette: 0.3 (k=2) → 0.5 (k=3) → 0.52 (k=4) → improvement slows after k=3
 
 3. **Domain knowledge**: Do the clusters make sense for your OCSF data?
-   - If k=4 gives you: successful logins, failed logins, privileged access, bulk transfers → makes sense
-   - If k=10 gives you tiny arbitrary splits → probably overfitting
+   - k=4 gives: successful logins, failed logins, privileged access, bulk transfers → makes sense
+   - k=10 gives tiny arbitrary splits → probably overfitting
 
-4. **Calinski-Harabasz interpretation**: Ratio of between-cluster to within-cluster variance
-   - Higher values = better-defined clusters
-   - No fixed threshold, use relative comparison (k=5 has 450, k=3 has 320 → k=5 better)
-
-**For OCSF security data**:
-- Start with k = number of event types you expect (e.g., 3-5 for authentication logs)
-- If unsure, try k=3 to 7 and pick based on metrics + visualization
+**For OCSF security data**: Start with k = number of event types you expect (typically 3-7 for authentication logs).
 
 ---
 
-## 3. Embedding Robustness (Quantitative)
+## 4. Phase 3: Robustness & Utility (The Stress Test)
 
-**Why robustness matters**: In production, your OCSF data will have noise - network jitter causes slight timestamp variations, rounding errors affect byte counts. Good embeddings should be stable under these small perturbations.
+Having good metrics on static data isn't enough. We need to ensure embeddings work in the real world where data has noise and the goal is actual anomaly detection.
+
+### 4.1 Perturbation Stability
+
+**Why robustness matters**: In production, OCSF data has noise—network jitter causes timestamp variations, rounding errors affect byte counts. Good embeddings should be stable under these small perturbations.
 
 **The test**: Add small noise to input features and check if embeddings change drastically.
-- ✅ Good: Cosine similarity > 0.95 (embeddings barely change)
-- ❌ Bad: Cosine similarity < 0.85 (embeddings are unstable, model is fragile)
 
-**Why instability is bad**: If a login with 1024 bytes gets embedding A, but 1030 bytes (+0.6% noise) gets completely different embedding B, your anomaly detector will give inconsistent results. Same event detected as anomaly one day, normal the next.
+<!-- [Image: Diagram showing original embedding vector, perturbed input (with small noise added to numerical features), and the resulting perturbed embedding, with cosine similarity measurement between them] -->
 
-### Perturbation Stability
+**Cosine Similarity**: Measures the angle between two embedding vectors. Range: -1 to +1. Values close to 1 mean vectors point in same direction (similar records).
 
-**What this measures**: Cosine similarity between original and slightly perturbed embeddings.
+| Stability Score | Interpretation | Action |
+|-----------------|----------------|--------|
+| > 0.95 | Very stable—robust to noise | Safe to deploy |
+| 0.85-0.95 | Moderately stable | Test with larger noise, consider more regularization |
+| < 0.85 | Unstable—model is fragile | Add dropout, use more aggressive augmentation |
+
+**Why instability is bad**: If a login with 1024 bytes gets embedding A, but 1030 bytes (+0.6% noise) gets completely different embedding B, your anomaly detector will give inconsistent results.
 
 ```{code-cell}
 def evaluate_embedding_stability(model, numerical, categorical, num_perturbations=10, noise_level=0.1):
@@ -715,48 +658,26 @@ print("Embedding stability evaluation function defined")
 print("Usage: evaluate_embedding_stability(model, numerical, categorical)")
 ```
 
-**Interpreting stability scores**:
+**What if stability is too high (>0.99)?** Model might be "too smooth"—not capturing fine-grained distinctions. Check nearest neighbors to see if similar-but-different events are being confused.
 
-1. **High stability (>0.95)**: Embeddings are robust
-   - Model learned semantic patterns, not memorizing exact values
-   - Safe to deploy - will handle real-world noise well
-
-2. **Moderate stability (0.85-0.95)**: Acceptable but monitor
-   - Some sensitivity to input variations
-   - Test with larger noise_level (0.2) to see if it drops further
-   - Consider more training epochs or regularization (dropout)
-
-3. **Low stability (<0.85)**: Embeddings are fragile
-   - Model is overfitting to exact feature values
-   - Add more regularization: increase dropout from 0.1 → 0.2
-   - Use more aggressive augmentation during training (Part 4)
-
-**What if stability is too high (>0.99)?**:
-- Model might be "too smooth" - not capturing fine-grained distinctions
-- Check nearest neighbors: does model confuse similar-but-different events?
-- May need to reduce regularization or augmentation
-
-**For security data**: Target stability > 0.92. Security events have natural variation (same attack might have slightly different byte counts), so embeddings must be robust.
+**For security data**: Target stability > 0.92.
 
 ---
 
-## 4. Downstream Task Performance (Quantitative)
+### 4.2 Proxy Tasks: k-NN Classification
 
-**Why this matters**: All previous metrics are proxies. The ultimate test is: do these embeddings actually help with your end task (anomaly detection)?
+All previous metrics are proxies. The ultimate test is: do these embeddings actually help with your end task (anomaly detection)?
 
-**The gold standard**: Test on real anomaly detection and measure F1 score (covered in Part 6). But if you have some labeled data, k-NN classification is a quick proxy.
+**The idea**: If good embeddings make similar events close together, a simple k-NN classifier should achieve high accuracy using those embeddings. Low k-NN accuracy = embeddings aren't capturing useful patterns.
 
-**The idea**: If good embeddings make similar events close together, a simple k-NN classifier should achieve high accuracy. If k-NN accuracy is low, embeddings aren't capturing useful patterns.
+**When to use**: You have some labeled OCSF data (e.g., 1000 logins labeled as "normal user", "service account", "privileged access").
 
-### Proxy Task: k-NN Classification
-
-**When to use this**: You have some labeled OCSF data (e.g., 1000 logins labeled as "normal user", "service account", "privileged access").
-
-**Interpretation**:
-- **> 0.90**: Excellent embeddings - clear separation between classes
-- **0.80-0.90**: Good embeddings - suitable for production
-- **0.70-0.80**: Moderate - may struggle with edge cases
-- **< 0.70**: Poor - embeddings don't capture class distinctions
+| Accuracy | Interpretation |
+|----------|----------------|
+| > 0.90 | Excellent embeddings—clear separation between classes |
+| 0.80-0.90 | Good embeddings—suitable for production |
+| 0.70-0.80 | Moderate—may struggle with edge cases |
+| < 0.70 | Poor—embeddings don't capture class distinctions |
 
 ```{code-cell}
 from sklearn.neighbors import KNeighborsClassifier
@@ -792,9 +713,9 @@ knn_acc, knn_std = evaluate_knn_classification(all_embeddings[:600], labels_subs
 
 ---
 
-## 5. Benchmark Comparison
+### 4.3 Model Benchmarking
 
-### Compare Different Models
+Compare different architectures and hyperparameters systematically.
 
 ```{code-cell}
 def compare_embedding_models(embeddings_dict, labels, metric='silhouette'):
@@ -859,27 +780,29 @@ comparison = compare_embedding_models(embeddings_dict, labels_subset, metric='si
    - If 512 improves by 0.10, the extra capacity is worth it
 
 2. **Architecture changes**: Compare TabularResNet vs other architectures
-   - Helps justify your choice: "ResNet beat MLP by 0.15 Silhouette"
+   - Document: "ResNet beat MLP by 0.15 Silhouette"
 
 3. **Training strategy**: Compare contrastive learning vs MFP
    - Which self-supervised method works better for your OCSF data?
 
 ---
 
-## 6. Operational Metrics (Production Readiness)
+## 5. Phase 4: Production Readiness (Operational Metrics)
 
-**Why operational metrics matter**: Even with perfect embeddings (Silhouette = 1.0), the model is useless if it's too slow for real-time detection or too large to deploy.
+Even with perfect embeddings (Silhouette = 1.0), the model is useless if it's too slow for real-time detection or too large to deploy.
 
 **The reality**: You're embedding millions of OCSF events per day. Latency, memory, and throughput directly impact your system's viability.
 
-### Inference Latency
+### 5.1 Inference Latency
 
 **What this measures**: Time to embed a single OCSF record (milliseconds).
 
-**Target latencies by use case**:
-- **Real-time detection** (<100ms): Must embed and detect anomalies while event is streaming
-- **Near real-time** (<1s): Acceptable for batch processing every few seconds
-- **Offline analysis** (<10s): Acceptable for historical log analysis
+| Target Latency | Use Case |
+|----------------|----------|
+| < 10ms | Real-time detection (streaming) |
+| 10-50ms | Near real-time (batch every few seconds) |
+| 50-100ms | Batch processing |
+| > 100ms | Historical analysis only |
 
 ```{code-cell}
 import time
@@ -944,9 +867,11 @@ print("Usage: measure_inference_latency(model, numerical_batch, categorical_batc
 - **Smaller models**: If d_model=512 and d_model=256 have similar quality, use 256
 - **GPU deployment**: For high-volume streams (>1000 events/sec)
 
-### Memory Footprint
+---
 
-**What this measures**: Storage required per embedding vector.
+### 5.2 Memory Footprint & Storage Costs
+
+**What this measures**: Storage required per embedding vector in your vector database.
 
 ```{code-cell}
 def analyze_memory_footprint(embedding_dim, num_events, precision='float32'):
@@ -993,11 +918,11 @@ footprint = analyze_memory_footprint(
 ```
 
 **When memory matters**:
-- **Vector databases**: Pinecone, Weaviate charge by storage (more GB = higher cost)
+- **Vector databases**: Pinecone, Weaviate charge by storage
 - **In-memory search**: Need to fit embeddings in RAM for fast k-NN lookup
 - **Historical data**: Storing 1 year of logs with embeddings
 
-**Cost implications**:
+**Cost implications** (example):
 - 10M events × 256-dim × float32 = 10 GB
 - Pinecone costs ~$0.096/GB/month = $1/month for 10M events
 - Scale to 1B events = 1TB storage = $100/month
@@ -1007,9 +932,13 @@ footprint = analyze_memory_footprint(
 - Reduce **d_model** if quality allows (512→256 = 50% smaller)
 - Compress old embeddings (after 30 days, switch to int8)
 
-### Dimensions vs Performance Trade-off
+---
+
+### 5.3 The Dimension Trade-off
 
 **The question**: Does using d_model=512 actually improve quality enough to justify 2x cost?
+
+<!-- [Image: Line chart showing Silhouette Score vs Embedding Dimension (128, 256, 512) with a second y-axis showing Storage Cost, illustrating the diminishing returns] -->
 
 ```{code-cell}
 def compare_embedding_dimensions():
@@ -1046,15 +975,17 @@ compare_embedding_dimensions()
 1. Start with d_model=256 (good default)
 2. If quality is poor (<0.5 Silhouette), try d_model=512
 3. If latency is too high (>50ms), try d_model=128
-4. Always measure - don't assume bigger is better
+4. Always measure—don't assume bigger is better
 
 ---
 
-## 7. Production Checklist
+## 6. Synthesis: The Pre-Deployment Protocol
 
-Before deploying embeddings to production, verify all criteria across quantitative and qualitative evaluation:
+Before deploying embeddings to production, verify all criteria across the four phases.
 
-### Quantitative Metrics
+### 6.1 The "Go/No-Go" Checklist
+
+#### Quantitative Metrics
 
 | Criterion | Threshold | Why It Matters | Action if Failed |
 |-----------|-----------|----------------|------------------|
@@ -1065,7 +996,7 @@ Before deploying embeddings to production, verify all criteria across quantitati
 | **Inference Latency** | < 50ms | Real-time detection capability | Reduce d_model, optimize with ONNX, use GPU |
 | **Memory Footprint** | Fits budget | Cost control | Use float16, reduce d_model, compress old embeddings |
 
-### Qualitative Checks
+#### Qualitative Checks
 
 | Check | What to Look For | Red Flags |
 |-------|------------------|-----------|
@@ -1074,7 +1005,7 @@ Before deploying embeddings to production, verify all criteria across quantitati
 | **Semantic Failure Testing** | Model distinguishes critical security events | Brute force looks like normal login |
 | **Cluster Interpretation** | Clusters map to known event types | Arbitrary splits, no domain meaning |
 
-### Pre-Deployment Workflow
+#### Pre-Deployment Workflow
 
 1. **Run quantitative metrics** → All thresholds passed?
 2. **Visual inspection** → Clusters make sense?
@@ -1084,7 +1015,11 @@ Before deploying embeddings to production, verify all criteria across quantitati
 6. **Generate report** → Document all metrics for reproducibility
 7. **Test on Part 6** → Run anomaly detection algorithms, measure F1 score
 
-### Code: Automated Quality Report
+---
+
+### 6.2 Automated Quality Report
+
+The final script that ties everything together:
 
 ```{code-cell}
 def generate_embedding_quality_report(embeddings, labels=None, model=None, save_path='embedding_report.html'):
@@ -1152,53 +1087,35 @@ report = generate_embedding_quality_report(all_embeddings[:600], labels_subset)
 
 ---
 
-## Summary
+## 7. Summary & Next Steps
 
-In this part, you learned a comprehensive two-pronged approach to evaluating embedding quality before production deployment:
+In this part, you learned a comprehensive four-phase approach to evaluating embedding quality before production deployment:
 
-### Qualitative Evaluation (Manual Inspection)
+### Phase 1: Qualitative Inspection
+- **t-SNE** for local structure and cluster identification
+- **UMAP** for global structure and faster processing
+- **Nearest Neighbor Inspection** to catch semantic failures metrics miss
+- Interpretation guides for spotting problems (blobs, random scatter, mixed classes)
 
-1. **Visualization**:
-   - t-SNE for local structure and cluster identification
-   - UMAP for global structure and faster processing
-   - How to interpret plots and spot problems (blobs, random scatter, mixed classes)
-   - Hyperparameter tuning (perplexity for t-SNE, n_neighbors for UMAP)
+### Phase 2: Cluster Quality Metrics
+- **Silhouette Score** (target: > 0.5)—measures separation between clusters
+- **Davies-Bouldin Index** (target: < 1.0)—measures cluster overlap
+- **Calinski-Harabasz Score**—variance ratio for relative comparison
+- How to choose optimal number of clusters (k)
 
-2. **Nearest Neighbor Inspection** (NEW):
-   - Manually verify k nearest neighbors are semantically similar
-   - Catch semantic failures metrics miss (e.g., model confusing success/failure)
-   - Common failure patterns in security data
-   - Action items when neighbors look wrong
+### Phase 3: Robustness & Utility
+- **Perturbation stability** (target: > 0.92)—ensures embeddings handle noise
+- **k-NN classification** (target: > 0.85)—proxy for downstream task performance
+- **Model benchmarking**—systematic comparison of architectures and hyperparameters
 
-3. **Semantic Failure Detection**:
-   - Test edge cases critical for security (brute force vs normal login)
-   - Verify model preserves important distinctions (status, severity, user behavior)
-
-### Quantitative Evaluation (Automated Metrics)
-
-1. **Cluster Quality Metrics**:
-   - Silhouette Score (target: > 0.5) - measures separation between clusters
-   - Davies-Bouldin Index (target: < 1.0) - measures cluster overlap
-   - Calinski-Harabasz Score - ratio of between/within cluster variance
-   - How to choose optimal number of clusters (k) using multiple metrics
-
-2. **Robustness Testing**:
-   - Perturbation stability (target: > 0.92) - ensures embeddings handle noise
-   - How to interpret stability scores and fix fragile embeddings
-   - What to do when stability is too high or too low
-
-3. **Downstream Task Performance**:
-   - k-NN classification as proxy metric (target: > 0.85 accuracy)
-   - Model comparison framework for hyperparameter tuning
-
-4. **Operational Metrics** (NEW):
-   - Inference latency measurement and optimization (target: < 50ms)
-   - Memory footprint analysis and cost implications
-   - Embedding dimensions vs performance trade-offs
+### Phase 4: Production Readiness
+- **Inference latency** (target: < 50ms)—real-time detection capability
+- **Memory footprint**—storage costs and optimization strategies
+- **Dimension trade-offs**—balancing quality vs cost
 
 ### Key Takeaways
 
-- **Use both approaches**: Numbers don't tell the whole story - you must look at the data
+- **Use both qualitative and quantitative**: Numbers don't tell the whole story—you must look at the data
 - **Security-specific concerns**: Check that critical security distinctions (success/failure, privilege levels) are preserved
 - **Production readiness**: Balance quality, latency, and cost before deploying
 - **Iterative process**: If embeddings fail evaluation, go back to Parts 3-4 (feature engineering, training)
