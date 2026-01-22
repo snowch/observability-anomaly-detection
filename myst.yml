@@ -61,6 +61,7 @@ site:
   title: Observability Anomaly Detection
   options:
     logo_text: Observability Anomaly Detection
+    style: ./custom.css
   nav:
     - title: GitHub
       url: https://github.com/snowch/observability-anomaly-detection

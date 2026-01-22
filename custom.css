@@ -1,0 +1,40 @@
+/* ==========================================================================
+   Code Block & Output Styling
+   ========================================================================== */
+
+/* 1. Standard Input Code Blocks (Fenced blocks, {code-cell}, etc.) */
+pre.myst-code,
+.myst-code pre,
+pre.myst-code code,
+.myst-code code {
+  font-size: 0.9em;       /* Adjust this value (e.g. 0.85em - 1.0em) as needed */
+  line-height: 1.4;
+}
+
+/* 2. Output Streams (Print statements, logs, etc.)
+   The !important flags are necessary to override the default 'text-sm' and 'font-thin'
+   classes that Jupyter Book/Myst often injects automatically. */
+pre.myst-jp-stream-output {
+  font-size: 0.9em !important;    /* Matches the input code size */
+  font-weight: normal !important; /* Fixes the 'faint' text issue */
+  line-height: 1.4;
+  font-family: inherit;           /* Ensures it uses your code font */
+}
+
+/* Prevents double-shrinking if there is a <code> tag inside the <pre> */
+pre.myst-jp-stream-output code {
+  font-size: 100%;
+}
+
+/* 3. Inline Code (e.g. `variable_name`)
+   Keeps inline code slightly larger for readability within prose. */
+:not(pre) > code {
+  font-size: 0.95em;
+}
+
+/* 4. Dataframe Outputs (Pandas HTML tables) */
+.jp-RenderedHTMLCommon .dataframe,
+.jp-RenderedHTML .dataframe,
+.dataframe {
+  font-size: 0.6em;
+}
