@@ -40,7 +40,7 @@ jobs:
           # base_path is "/" for a user site, and "/repo" for a project site.
           # MyST often expects empty string for root.
           BASE_URL: ${{ steps.pages.outputs.base_path == '/' && '' || steps.pages.outputs.base_path }}
-        run: myst build --html --base-url "$BASE_URL"
+        run: myst build --html
 
       - name: Upload artifact
         if: github.event_name != 'pull_request'
