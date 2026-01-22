@@ -1,6 +1,7 @@
 # Python dependencies for MyST notebook execution
 numpy
 pandas
+pyarrow
 matplotlib
 scikit-learn
 torch --index-url https://download.pytorch.org/whl/cpu
