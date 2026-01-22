@@ -263,7 +263,7 @@ Visualization shows overall structure, but you need to zoom in and check if indi
 <!-- [Image: Diagram showing a query embedding with arrows pointing to its top-5 neighbors, with semantic labels showing whether neighbors are correctly similar] -->
 
 ```{code-cell}
-def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, k=10):
+def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, query_record=None, k=10):
     """
     Find and display the k nearest neighbors for a query embedding.
 
@@ -271,6 +271,7 @@ def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, k=10
         query_embedding: Single embedding vector (embedding_dim,)
         all_embeddings: All embeddings (num_samples, embedding_dim)
         all_records: List of original OCSF records (for display)
+        query_record: The query record (for display) - helps verify neighbors make sense
         k: Number of neighbors to return
 
     Returns:
@@ -293,6 +294,11 @@ def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, k=10
     print("\n" + "="*60)
     print("NEAREST NEIGHBOR INSPECTION")
     print("="*60)
+
+    # Print query record first so we know what we're looking for
+    if query_record is not None:
+        print(f"\nQUERY RECORD: {query_record}")
+        print("-"*60)
 
     for rank, idx in enumerate(top_k_indices, 1):
         sim = similarities[idx]
@@ -328,6 +334,7 @@ neighbors, sims = inspect_nearest_neighbors(
     simulated_embeddings[0],
     simulated_embeddings,
     simulated_records,
+    query_record=simulated_records[0],  # Show what we're querying for
     k=5
 )
 
