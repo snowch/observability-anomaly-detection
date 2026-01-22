@@ -363,8 +363,14 @@ volumes:
 ### Model Registry with MLflow
 
 ```{code-cell}
-import mlflow
-import mlflow.pytorch
+try:
+    import mlflow
+    import mlflow.pytorch
+    MLFLOW_AVAILABLE = True
+except ImportError:
+    MLFLOW_AVAILABLE = False
+    print("MLflow not installed. Install with: pip install mlflow")
+    print("Skipping MLflow model registry example.")
 
 def register_model(model, scaler, encoders, metrics, experiment_name="ocsf-anomaly-detection"):
     """
@@ -378,8 +384,12 @@ def register_model(model, scaler, encoders, metrics, experiment_name="ocsf-anoma
         experiment_name: MLflow experiment name
 
     Returns:
-        model_version
+        model_version or None if MLflow is not available
     """
+    if not MLFLOW_AVAILABLE:
+        print("MLflow not available. Skipping model registration.")
+        return None
+
     mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run():
