@@ -6,6 +6,9 @@ matplotlib
 scikit-learn
 torch --index-url https://download.pytorch.org/whl/cpu
 
+# MLflow for model versioning (Part 7)
+mlflow
+
 # Jupyter dependencies for code-cell execution
 jupyter
 ipykernel
