@@ -473,104 +473,88 @@ config_embedding = EmbeddingRecord(
 - **Timestamp**: Critical for temporal correlation
 - **Flexible metadata**: Store source-specific details without rigid schema
 
-### Vector DB Implementation with Pinecone
+### Vector DB Implementation with FAISS
 
-Here's how to set up a multi-source vector index using Pinecone:
+Here's how to set up a multi-source vector index using FAISS (Facebook AI Similarity Search):
 
 ```{code-cell} ipython3
-try:
-    import pinecone
-    from pinecone import Pinecone, ServerlessSpec
-    PINECONE_AVAILABLE = True
-except ImportError:
-    PINECONE_AVAILABLE = False
-    print("Pinecone not installed. Install with: pip install pinecone-client")
-    print("Skipping Pinecone vector DB example.")
+import faiss
+import numpy as np
 
-if PINECONE_AVAILABLE:
-    # Initialize Pinecone
-    pc = Pinecone(api_key="your-api-key")
+class ObservabilityVectorDB:
+    """
+    Simple vector database for observability embeddings using FAISS.
+    Stores embeddings with metadata for filtering and retrieval.
+    """
 
-    # Create a single index for all sources
-    index_name = "observability-embeddings"
+    def __init__(self, dimension: int = 64):
+        # Use IndexFlatIP for inner product (cosine similarity on normalized vectors)
+        self.index = faiss.IndexFlatIP(dimension)
+        self.metadata = []  # Store metadata alongside vectors
+        self.ids = []       # Track record IDs
 
-    # Check if index exists, create if not
-    if index_name not in pc.list_indexes().names():
-        pc.create_index(
-            name=index_name,
-            dimension=64,  # Match our embedding dimension
-            metric='cosine',  # Cosine similarity for normalized embeddings
-            spec=ServerlessSpec(
-                cloud='aws',
-                region='us-east-1'
-            )
-        )
-
-    index = pc.Index(index_name)
-
-    # Upsert embeddings with metadata
-    def store_embedding(record: EmbeddingRecord, record_id: str):
+    def store_embedding(self, record: EmbeddingRecord, record_id: str):
         """Store an embedding record in the vector DB."""
-        index.upsert(vectors=[{
-            'id': record_id,
-            'values': record.embedding,
-            'metadata': {
-                'timestamp': record.timestamp.isoformat(),
-                'source_type': record.source_type,
-                'service': record.service,
-                'environment': record.environment,
-                **record.metadata  # Merge source-specific metadata
-            }
-        }])
+        # Normalize for cosine similarity
+        embedding = np.array([record.embedding], dtype=np.float32)
+        faiss.normalize_L2(embedding)
 
-    # Example: Store embeddings from all sources
-    store_embedding(metric_embedding, 'metric_001')
-    store_embedding(trace_embedding, 'trace_001')
-    store_embedding(config_embedding, 'config_001')
+        self.index.add(embedding)
+        self.ids.append(record_id)
+        self.metadata.append({
+            'timestamp': record.timestamp.isoformat(),
+            'source_type': record.source_type,
+            'service': record.service,
+            'environment': record.environment,
+            **record.metadata
+        })
 
-    print(f"Stored embeddings in unified vector DB: {index_name}")
-    print(f"Total vectors: {index.describe_index_stats()['total_vector_count']}")
-```
+    def search(self, query_embedding: np.ndarray, k: int = 10, source_type: str = None):
+        """
+        Search for similar embeddings, optionally filtered by source type.
 
-**Alternative: Using Milvus** (open-source option):
+        Args:
+            query_embedding: Query vector (will be normalized)
+            k: Number of results to return
+            source_type: Optional filter for source type
 
-```{code-cell} ipython3
-try:
-    from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType
-    MILVUS_AVAILABLE = True
-except ImportError:
-    MILVUS_AVAILABLE = False
-    print("PyMilvus not installed. Install with: pip install pymilvus")
-    print("Skipping Milvus vector DB example.")
+        Returns:
+            List of (id, metadata, score) tuples
+        """
+        query = np.array([query_embedding], dtype=np.float32)
+        faiss.normalize_L2(query)
 
-if MILVUS_AVAILABLE:
-    # Connect to Milvus
-    connections.connect(host='localhost', port='19530')
+        # Search more results if filtering, then filter down
+        search_k = k * 4 if source_type else k
+        scores, indices = self.index.search(query, min(search_k, self.index.ntotal))
 
-    # Define schema with metadata fields
-    fields = [
-        FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
-        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=64),
-        FieldSchema(name="timestamp", dtype=DataType.VARCHAR, max_length=50),
-        FieldSchema(name="source_type", dtype=DataType.VARCHAR, max_length=20),
-        FieldSchema(name="service", dtype=DataType.VARCHAR, max_length=50),
-        FieldSchema(name="environment", dtype=DataType.VARCHAR, max_length=20),
-    ]
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx == -1:  # FAISS returns -1 for empty slots
+                continue
+            meta = self.metadata[idx]
+            if source_type and meta['source_type'] != source_type:
+                continue
+            results.append((self.ids[idx], meta, float(score)))
+            if len(results) >= k:
+                break
 
-    schema = CollectionSchema(fields, description="Multi-source observability embeddings")
-    collection = Collection(name="observability_embeddings", schema=schema)
+        return results
 
-    # Create index on embedding field
-    collection.create_index(
-        field_name="embedding",
-        index_params={
-            "metric_type": "IP",  # Inner product (for normalized vectors)
-            "index_type": "IVF_FLAT",
-            "params": {"nlist": 128}
-        }
-    )
+    @property
+    def total_vectors(self):
+        return self.index.ntotal
 
-    print(f"Milvus collection created: {collection.name}")
+# Create unified vector DB for all sources
+vector_db = ObservabilityVectorDB(dimension=64)
+
+# Store embeddings from all sources
+vector_db.store_embedding(metric_embedding, 'metric_001')
+vector_db.store_embedding(trace_embedding, 'trace_001')
+vector_db.store_embedding(config_embedding, 'config_001')
+
+print(f"Stored embeddings in unified vector DB")
+print(f"Total vectors: {vector_db.total_vectors}")
 ```
 
 **Key design decision**: Use a **single collection** for all sources, not separate collections. This enables:
@@ -594,7 +578,7 @@ def detect_anomalies_per_source(index, source_type, time_window_hours=1, k=10, t
     Detect anomalies for a specific source type within a time window.
 
     Args:
-        index: Pinecone/Milvus index
+        index: Vector database (e.g., ObservabilityVectorDB)
         source_type: 'logs', 'metrics', 'traces', or 'config'
         time_window_hours: How far back to look
         k: Number of nearest neighbors
@@ -642,10 +626,10 @@ def detect_anomalies_per_source(index, source_type, time_window_hours=1, k=10, t
     return anomalies
 
 # Detect anomalies in each source
-metric_anomalies = detect_anomalies_per_source(index, 'metrics')
-trace_anomalies = detect_anomalies_per_source(index, 'traces')
-log_anomalies = detect_anomalies_per_source(index, 'logs')
-config_anomalies = detect_anomalies_per_source(index, 'config')
+metric_anomalies = detect_anomalies_per_source(vector_db, 'metrics')
+trace_anomalies = detect_anomalies_per_source(vector_db, 'traces')
+log_anomalies = detect_anomalies_per_source(vector_db, 'logs')
+config_anomalies = detect_anomalies_per_source(vector_db, 'config')
 
 print(f"Detected anomalies:")
 print(f"  Metrics: {len(metric_anomalies)}")
@@ -1697,19 +1681,24 @@ With multiple services and data sources, the number of embeddings can grow rapid
 4. **Compression**: Use product quantization for older embeddings
 
 ```{code-cell} ipython3
-# Example: Time-based partitioning with Pinecone
+# Example: Time-based partitioning with FAISS
+# Maintain separate indices for different time windows
+hot_index = ObservabilityVectorDB(dimension=64)   # Last 7 days
+warm_index = ObservabilityVectorDB(dimension=64)  # 7-30 days
+cold_index = ObservabilityVectorDB(dimension=64)  # 30+ days
+
 def get_appropriate_index(timestamp):
     """Route to hot or cold storage based on age."""
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     age_days = (datetime.now() - timestamp).days
 
     if age_days <= 7:
-        return pc.Index("observability-hot")
+        return hot_index
     elif age_days <= 30:
-        return pc.Index("observability-warm")
+        return warm_index
     else:
-        return pc.Index("observability-cold")
+        return cold_index
 ```
 
 ### 4. Real-Time Processing
@@ -1752,6 +1741,8 @@ def process_observability_stream():
         if is_anomaly:
             # Trigger correlation analysis
             trigger_rca_analysis(event, embedding, score)
+
+print("process_observability_stream() defined")
 ```
 
 ---
