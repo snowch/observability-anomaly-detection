@@ -268,7 +268,7 @@ Evaluate embedding quality before deployment:
 :::
 
 :::{grid-item-card} Notebook: Model Inference
-:link: notebooks/05-model-inference
+:link: notebooks/07-model-inference
 :link-type: doc
 
 Load trained model and generate embeddings:
@@ -276,7 +276,7 @@ Load trained model and generate embeddings:
 - Run inference on new data
 - Extract embedding vectors
 
-**Hands-on** · Part 5
+**Hands-on** · Part 7
 :::
 
 :::{grid-item-card} Notebook: Anomaly Detection

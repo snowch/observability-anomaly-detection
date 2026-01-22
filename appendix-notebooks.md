@@ -54,8 +54,8 @@ View the executed notebooks with output, or download to run yourself:
 | [Feature Engineering](notebooks/03-feature-engineering) | Load OCSF data, extract temporal features, encode for ML | Sample data |
 | [Self-Supervised Training](notebooks/04-self-supervised-training) | Train TabularResNet with contrastive learning | Part 3 output |
 | [Embedding Evaluation](notebooks/05-embedding-evaluation) | Evaluate embedding quality with metrics and visualization | Part 4 output |
-| [Model Inference](notebooks/05-model-inference) | Load trained model and generate embeddings for new data | Part 4 output |
 | [Anomaly Detection](notebooks/06-anomaly-detection) | Compare k-NN, LOF, Isolation Forest detection | Part 4 output |
+| [Model Inference](notebooks/07-model-inference) | Load trained model and generate embeddings for new data | Part 4 output |
 
 Notebook source files are in the [`notebooks/`](https://github.com/snowch/observability-anomaly-detection/tree/main/notebooks) directory.
 
@@ -88,32 +88,32 @@ graph LR
         report["Quality report"]
     end
 
-    subgraph nb4["05-model-inference"]
-        loadmodel["Load trained model"]
-        infer["Generate embeddings"]
-        package["Package for deployment"]
-    end
-
-    subgraph nb5["06-anomaly-detection"]
+    subgraph nb4["06-anomaly-detection"]
         knn["k-NN distance"]
         lof["LOF"]
         iso["Isolation Forest"]
         ensemble["Ensemble voting"]
     end
 
+    subgraph nb5["07-model-inference"]
+        loadmodel["Load trained model"]
+        infer["Generate embeddings"]
+        package["Package for deployment"]
+    end
+
     parquet --> load
     load --> temporal --> encode
     encode --> model --> train --> embed
     embed --> tsne --> metrics --> neighbors --> report
-    report --> loadmodel --> infer --> package
     embed --> knn & lof & iso --> ensemble
+    report --> loadmodel --> infer --> package
 
     style data fill:#e1ffe1
     style nb1 fill:#e1f5ff
     style nb2 fill:#fff4e1
     style nb3 fill:#ffe1ff
-    style nb4 fill:#ffe8e1
-    style nb5 fill:#ffe1e1
+    style nb4 fill:#ffe1e1
+    style nb5 fill:#ffe8e1
 ```
 
 ---
@@ -168,21 +168,6 @@ graph LR
 
 ---
 
-### 05-model-inference.md
-
-**Goal**: Load the trained model and generate embeddings for new OCSF data.
-
-**Key steps:**
-1. Load saved model weights and feature artifacts
-2. Create inference pipeline for new data
-3. Preprocess new OCSF events (same encoding as training)
-4. Generate embeddings using trained TabularResNet
-5. Package model for production deployment
-
-**Output:** `inference_package.pt` (model + preprocessing in one file)
-
----
-
 ### 06-anomaly-detection.md
 
 **Goal**: Detect anomalies using multiple algorithms and compare performance.
@@ -197,6 +182,21 @@ graph LR
 7. Inspect top anomalies
 
 **Output:** `anomaly_predictions.parquet`
+
+---
+
+### 07-model-inference.md
+
+**Goal**: Load the trained model and generate embeddings for new OCSF data.
+
+**Key steps:**
+1. Load saved model weights and feature artifacts
+2. Create inference pipeline for new data
+3. Preprocess new OCSF events (same encoding as training)
+4. Generate embeddings using trained TabularResNet
+5. Package model for production deployment
+
+**Output:** `inference_package.pt` (model + preprocessing in one file)
 
 ---
 
