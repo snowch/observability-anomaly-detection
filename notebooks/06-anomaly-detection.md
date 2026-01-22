@@ -110,7 +110,8 @@ def detect_anomalies_knn_distance(embeddings, k=20, contamination=0.05):
     """
     Detect anomalies using k-NN average distance.
 
-    Uses efficient tree-based search (avoids N*N distance matrix).
+    Uses L2-normalized embeddings with euclidean distance, which is
+    equivalent to cosine distance but allows efficient tree-based search.
     Memory footprint: ~4MB for 27K embeddings with k=20.
 
     Args:
@@ -123,13 +124,19 @@ def detect_anomalies_knn_distance(embeddings, k=20, contamination=0.05):
         scores: Average distance to k neighbors (higher = more anomalous)
         threshold: Score threshold used
     """
-    # Fit k-NN model with parallel processing
-    # algorithm='auto' selects best algorithm (ball_tree, kd_tree, or brute)
-    nn = NearestNeighbors(n_neighbors=k+1, metric='cosine', algorithm='auto', n_jobs=-1)
-    nn.fit(embeddings)
+    from sklearn.preprocessing import normalize
+
+    # Normalize embeddings to unit length
+    # After normalization, euclidean distance ∝ cosine distance
+    # This allows tree-based algorithms (ball_tree, kd_tree) to work efficiently
+    embeddings_normalized = normalize(embeddings, norm='l2')
+
+    # Fit k-NN model with tree-based algorithm (avoids N*N distance matrix)
+    nn = NearestNeighbors(n_neighbors=k+1, algorithm='ball_tree', n_jobs=-1)
+    nn.fit(embeddings_normalized)
 
     # Get distances to k nearest neighbors (efficient - only k distances per point)
-    distances, _ = nn.kneighbors(embeddings)
+    distances, _ = nn.kneighbors(embeddings_normalized)
 
     # Average distance (excluding self at index 0)
     scores = distances[:, 1:].mean(axis=1)
