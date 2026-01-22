@@ -51,10 +51,10 @@ project:
       title: "Notebook: Self-Supervised Training"
     - file: notebooks/05-embedding-evaluation.md
       title: "Notebook: Embedding Evaluation"
-    - file: notebooks/05-model-inference.md
-      title: "Notebook: Model Inference"
     - file: notebooks/06-anomaly-detection.md
       title: "Notebook: Anomaly Detection"
+    - file: notebooks/07-model-inference.md
+      title: "Notebook: Model Inference"
  
 site:
   template: book-theme

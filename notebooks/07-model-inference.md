@@ -11,7 +11,7 @@ kernelspec:
 
 # Appendix: Model Saving and Inference
 
-> **Theory**: See [Part 5: Evaluating Embedding Quality](../part5-embedding-quality.md) for understanding how to assess embedding performance.
+> **Theory**: See [Part 7: Production Deployment](../part7-production-deployment.md) for the complete production architecture.
 
 Save trained models and use them for inference on new OCSF data.
 
