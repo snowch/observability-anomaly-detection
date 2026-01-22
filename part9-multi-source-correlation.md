@@ -401,6 +401,7 @@ Each embedding stored in the vector DB includes:
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from datetime import datetime
+import numpy as np
 
 @dataclass
 class EmbeddingRecord:
@@ -422,9 +423,12 @@ class EmbeddingRecord:
     anomaly_score: float = 0.0
     is_anomaly: bool = False
 
+# Generate example 64-dim embeddings (in production, these come from your trained models)
+np.random.seed(42)
+
 # Example: Storing a metric embedding
 metric_embedding = EmbeddingRecord(
-    embedding=[0.23, -0.45, 0.12, ...],  # 64 dims from metrics_model
+    embedding=np.random.randn(64).tolist(),  # 64 dims from metrics_model
     timestamp=datetime.now(),
     source_type='metrics',
     service='checkout-api',
@@ -439,7 +443,7 @@ metric_embedding = EmbeddingRecord(
 
 # Example: Storing a trace embedding
 trace_embedding = EmbeddingRecord(
-    embedding=[0.18, -0.32, 0.08, ...],  # 64 dims from traces_model
+    embedding=np.random.randn(64).tolist(),  # 64 dims from traces_model
     timestamp=datetime.now(),
     source_type='traces',
     service='payment-service',
@@ -454,7 +458,7 @@ trace_embedding = EmbeddingRecord(
 
 # Example: Storing a config change embedding
 config_embedding = EmbeddingRecord(
-    embedding=[0.45, -0.12, 0.33, ...],  # 64 dims from config_model
+    embedding=np.random.randn(64).tolist(),  # 64 dims from config_model
     timestamp=datetime.now(),
     source_type='config',
     service='checkout-api',
@@ -617,7 +621,7 @@ def detect_anomalies_per_source(index, source_type, time_window_hours=1, k=10, t
         'timestamp': datetime.now(),
         'source_type': source_type,
         'anomaly_score': 0.85,
-        'embedding': [0.23, -0.45, ...],
+        'embedding': np.random.randn(64).tolist(),  # 64-dim embedding
         'metadata': {'service': 'checkout-api', 'metric_name': 'cpu_usage'}
     }
 
