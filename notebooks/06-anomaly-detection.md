@@ -109,31 +109,35 @@ For each point:
 def detect_anomalies_knn_distance(embeddings, k=20, contamination=0.05):
     """
     Detect anomalies using k-NN average distance.
-    
+
+    Uses efficient tree-based search (avoids N*N distance matrix).
+    Memory footprint: ~4MB for 27K embeddings with k=20.
+
     Args:
         embeddings: (N, d) array of embeddings
         k: Number of neighbors
         contamination: Expected anomaly proportion
-    
+
     Returns:
         predictions: 1 for anomaly, 0 for normal
         scores: Average distance to k neighbors (higher = more anomalous)
         threshold: Score threshold used
     """
-    # Fit k-NN model (+1 because point is its own neighbor)
-    nn = NearestNeighbors(n_neighbors=k+1, metric='cosine')
+    # Fit k-NN model with parallel processing
+    # algorithm='auto' selects best algorithm (ball_tree, kd_tree, or brute)
+    nn = NearestNeighbors(n_neighbors=k+1, metric='cosine', algorithm='auto', n_jobs=-1)
     nn.fit(embeddings)
-    
-    # Get distances to k nearest neighbors
+
+    # Get distances to k nearest neighbors (efficient - only k distances per point)
     distances, _ = nn.kneighbors(embeddings)
-    
+
     # Average distance (excluding self at index 0)
     scores = distances[:, 1:].mean(axis=1)
-    
+
     # Threshold at percentile
     threshold = np.percentile(scores, 100 * (1 - contamination))
     predictions = (scores > threshold).astype(int)
-    
+
     return predictions, scores, threshold
 ```
 
