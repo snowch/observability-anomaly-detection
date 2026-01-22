@@ -36,7 +36,7 @@ ResNet offers several advantages:
 
 ### The Use Case: OCSF Observability Data
 
-Consider a security/observability scenario where you have:
+Consider an observability scenario where you have:
 - **Unlabelled data**: Millions of OCSF (Open Cybersecurity Schema Framework) records
 - **High dimensionality**: 300+ fields per record (categorical and numerical)
 - **Multi-record anomalies**: Patterns that span sequences of events

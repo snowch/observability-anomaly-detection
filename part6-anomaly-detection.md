@@ -17,7 +17,7 @@ Apply various anomaly detection algorithms to your validated embeddings for OCSF
 
 **What you'll learn**: How to detect anomalies using **vector DB only** - no separate detection model required. The vector database stores embeddings and finds similar records, while different scoring algorithms (distance-based, density-based, etc.) compute anomaly scores from those similarities. All methods work directly on TabularResNet embeddings without training additional models.
 
-**Optional extension**: Section 6 covers LSTM-based sequence detection for advanced use cases like multi-step attacks - this requires training a separate model and is outside the core vector DB architecture.
+**Optional extension**: Section 6 covers LSTM-based sequence detection for advanced use cases like multi-step anomalies (e.g., cascading failures) - this requires training a separate model and is outside the core vector DB architecture.
 
 ## Key Terminology
 
@@ -52,7 +52,7 @@ Once you have high-quality embeddings, you can detect anomalies using a **vector
 5. **Clustering-based**: Distance from cluster centroids
 
 **Optional advanced method (requires separate model):**
-6. **Sequence-based**: Multi-record anomalies using LSTM (for multi-step attacks)
+6. **Sequence-based**: Multi-record anomalies using LSTM (for cascading failures, correlated issues)
 
 Each method has different strengths. We'll implement all of them and compare.
 
@@ -118,19 +118,19 @@ is_anomaly = score > threshold
 4. Points in sparser regions get high LOF scores (> 1 = outlier)
 
 **When to use LOF**:
-- **Multiple clusters with different densities**: Login events might be dense, while rare privileged access is sparser but still normal
-- **Security data with natural groupings**: Different event types (authentication, file access, network) have different baseline densities
-- **Detecting isolated attacks**: Brute force attempts that occur in sparse regions, even if not "far" from normal events
+- **Multiple clusters with different densities**: Common operations might be dense, while rare maintenance tasks are sparser but still normal
+- **Observability data with natural groupings**: Different event types (API calls, database queries, background jobs) have different baseline densities
+- **Detecting isolated anomalies**: Unusual request patterns that occur in sparse regions, even if not "far" from normal events
 
-**Advantages for OCSF security data**:
+**Advantages for OCSF observability data**:
 - ✅ Adapts to local density (doesn't penalize naturally sparse event types)
-- ✅ Detects attacks that hide within legitimate traffic patterns
+- ✅ Detects anomalies that hide within legitimate traffic patterns
 - ✅ Works well when anomalies appear in unexpected combinations of features
 
 **Disadvantages**:
 - ❌ Sensitive to k parameter (too small = noisy, too large = misses local patterns)
 - ❌ Computationally expensive for large datasets (needs k-NN for every point)
-- ❌ Assumes anomalies are isolated (fails if attacks form dense clusters)
+- ❌ Assumes anomalies are isolated (fails if anomalies form dense clusters)
 
 **Interpretation**:
 - **LOF ≈ 1**: Similar density to neighbors (normal)
@@ -258,7 +258,7 @@ plt.show()
 - **Fast deployment**: No need to tune k parameter (unlike LOF, k-NN)
 - **Baseline comparison**: Quick to train, provides reasonable baseline performance
 
-**Advantages for OCSF security data**:
+**Advantages for OCSF observability data**:
 - ✅ Fast training and prediction (tree-based, can parallelize)
 - ✅ Handles curse of dimensionality better than distance-based methods
 - ✅ Detects global outliers effectively (events unlike anything seen before)
@@ -281,7 +281,7 @@ plt.show()
   - Fewer trees (50) → faster but noisier
   - Default 100 is usually good balance
 
-**For security data**: Isolation Forest works well as a **first pass** to catch obvious outliers before applying more expensive methods like LOF.
+**For observability data**: Isolation Forest works well as a **first pass** to catch obvious outliers before applying more expensive methods like LOF.
 
 ```{code-cell}
 from sklearn.ensemble import IsolationForest
@@ -350,13 +350,13 @@ print(f"  F1-Score:  {f1_if:.3f}")
 
 **When to use k-NN distance**:
 - **Vector DB architecture**: You're already retrieving neighbors, so distance is free
-- **Interpretable results**: "This login has no similar logins in the past 30 days" is easy to explain
+- **Interpretable results**: "This request has no similar requests in the past 30 days" is easy to explain
 - **Real-time detection**: Fast lookup in vector DB, immediate scoring
 - **Baseline method**: Simple to implement and understand
 
-**Advantages for OCSF security data**:
+**Advantages for OCSF observability data**:
 - ✅ **Directly maps to vector DB operations**: retrieve k neighbors → compute distance → score
-- ✅ **Easy to explain** to security analysts: "No similar events found"
+- ✅ **Easy to explain** to operations teams: "No similar events found"
 - ✅ **Works well with time windows**: Only compare to recent events (last 7 days)
 - ✅ **Low latency**: Single vector DB query per event
 
@@ -388,9 +388,9 @@ print(f"  F1-Score:  {f1_if:.3f}")
 - **Distance > threshold**: Anomaly (no similar events in history)
 - **Distance >> threshold** (2-3x): Strong anomaly signal (investigate immediately)
 
-**For security data**: k-NN distance is the **most common production method** because it:
+**For observability data**: k-NN distance is the **most common production method** because it:
 1. Leverages existing vector DB infrastructure
-2. Provides intuitive explanations for security teams
+2. Provides intuitive explanations for operations teams
 3. Scales to millions of events with approximate nearest neighbor search
 
 ```{code-cell}
@@ -468,10 +468,10 @@ Use one of these metrics consistently across indexing, retrieval, and scoring to
 - **Explainability**: Can label clusters and say "event doesn't match any known pattern"
 - **Preprocessing for other methods**: Cluster first, then apply LOF within clusters
 
-**Advantages for OCSF security data**:
-- ✅ **Semantic clustering**: Clusters often match natural event types (authentication, privileged access, bulk transfers)
+**Advantages for OCSF observability data**:
+- ✅ **Semantic clustering**: Clusters often match natural event types (API calls, database queries, background jobs)
 - ✅ **Per-cluster thresholds**: Can tune detection sensitivity per event type
-- ✅ **Drift detection**: Cluster shifts over time indicate changing attack patterns
+- ✅ **Drift detection**: Cluster shifts over time indicate changing system behavior
 - ✅ **Efficient**: Single distance computation per event (to nearest centroid)
 
 **Disadvantages**:
@@ -486,18 +486,18 @@ Use one of these metrics consistently across indexing, retrieval, and scoring to
   - Too few (k=3): Clusters are too broad, many anomalies missed
   - Too many (k=20): Over-segmentation, normal events flagged as anomalies
   - **Recommendation**: Use Silhouette Score from Part 5 to choose k
-  - **Security heuristic**: k = number of OCSF event types you expect (typically 5-10)
+  - **Observability heuristic**: k = number of OCSF event types you expect (typically 5-10)
 
 - **threshold_percentile**:
   - 90th: Aggressive detection (10% flagged)
   - 95th: Balanced (5% flagged) - recommended starting point
   - 99th: Conservative (1% flagged)
 
-**Cluster interpretation for security**:
-- **Cluster 0**: "Normal login events" (centroid = typical login pattern)
-- **Cluster 1**: "Failed logins" (centroid = failed auth pattern)
-- **Cluster 2**: "Privileged access" (centroid = admin/sudo events)
-- **Cluster 3**: "Bulk file operations" (centroid = large data transfers)
+**Cluster interpretation for observability**:
+- **Cluster 0**: "Normal API requests" (centroid = typical request pattern)
+- **Cluster 1**: "Error responses" (centroid = failed operation pattern)
+- **Cluster 2**: "Admin operations" (centroid = configuration changes)
+- **Cluster 3**: "Bulk data operations" (centroid = large data transfers)
 - **Anomaly**: Event far from all cluster centroids → investigate
 
 **Combining with other methods**:
@@ -510,7 +510,7 @@ Use one of these metrics consistently across indexing, retrieval, and scoring to
 - **Incremental clustering**: For streaming data, use online k-means to avoid full retraining
 - **Cluster drift monitoring**: Track cluster centroids over time - large shifts indicate concept drift
 
-**For security data**: Clustering works well as a **pre-filter** before expensive methods, or when you want **explainable clusters** that map to known event types.
+**For observability data**: Clustering works well as a **pre-filter** before expensive methods, or when you want **explainable clusters** that map to known event types.
 
 ```{code-cell}
 from sklearn.cluster import KMeans
@@ -957,7 +957,7 @@ In this part, you learned:
 2. **Method comparison** framework for selecting the best approach
 3. **Threshold tuning** using precision-recall curves
 4. **Production pipeline** for real-time anomaly detection
-5. **Optional advanced extension**: LSTM-based sequence anomaly detection for multi-step attacks (requires training a separate model)
+5. **Optional advanced extension**: LSTM-based sequence anomaly detection for cascading failures (requires training a separate model)
 
 **Key Takeaways:**
 - **Vector DB only**: The core architecture uses TabularResNet embeddings + scoring algorithms—no separate detection model
@@ -965,7 +965,7 @@ In this part, you learned:
 - **LOF** is good for detecting local density deviations
 - **Ensemble methods** combining multiple detectors often perform best
 - **Tune thresholds** based on your precision/recall requirements
-- **Sequence detection**: Only add if you need multi-step attack detection (adds model training complexity)
+- **Sequence detection**: Only add if you need multi-event pattern detection (adds model training complexity)
 
 **Next**: In [Part 7](part7-production-deployment), we'll deploy this system to production with REST APIs for embedding model serving and integration with observability platforms.
 

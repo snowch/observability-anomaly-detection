@@ -13,7 +13,7 @@ bibliography:
 
 # Part 3: Feature Engineering for OCSF Data
 
-Learn how to transform raw OCSF security logs into the feature arrays that TabularResNet expects.
+Learn how to transform raw OCSF observability logs into the feature arrays that TabularResNet expects.
 
 **Note**: If you don't have OCSF observability data to work with, see [Appendix: Generating Training Data](appendix-generating-training-data) to learn how to spin up a Docker Compose stack that generates realistic logs, metrics, and traces with labeled anomalies.
 
@@ -30,7 +30,7 @@ Learn how to transform raw OCSF security logs into the feature arrays that Tabul
 
 ## Understanding OCSF Structure
 
-The [Open Cybersecurity Schema Framework (OCSF)](https://schema.ocsf.io/) provides a standardized schema for security events. Each event has:
+The [Open Cybersecurity Schema Framework (OCSF)](https://schema.ocsf.io/) provides a standardized schema for observability events. Each event has:
 
 - **class_name**: Event type (Authentication, Network Activity, File Activity, etc.)
 - **Core fields**: severity_id, time, activity_id, status_id
@@ -93,12 +93,12 @@ The [Open Cybersecurity Schema Framework (OCSF)](https://schema.ocsf.io/) provid
 **Why**: OCSF data typically arrives in newline-delimited JSON format (`.jsonl`) where each line is a complete event. This format is:
 - Space-efficient for large datasets
 - Streamable (process one event at a time without loading everything into memory)
-- Standard format for security log exports
+- Standard format for observability log exports
 
 **Pitfalls**:
 - **Memory**: Loading all events at once can exhaust memory. For large datasets (millions of events), use generators or process in batches
 - **Malformed JSON**: Production logs often contain corrupted lines. Always wrap `json.loads()` in try/except
-- **Encoding issues**: Security logs may contain non-UTF-8 characters. Use `encoding='utf-8', errors='replace'` when opening files
+- **Encoding issues**: Observability logs may contain non-UTF-8 characters. Use `encoding='utf-8', errors='replace'` when opening files
 
 ### From JSON Files
 
@@ -150,7 +150,7 @@ for event in load_ocsf_generator('ocsf_events.jsonl'):
 
 **What we're doing**: Consuming OCSF events from a Kafka stream for near real-time processing.
 
-**Why**: Production security systems generate millions of events per day. Kafka provides:
+**Why**: Production observability systems generate millions of events per day. Kafka provides:
 - **Buffering**: Handles burst traffic without data loss
 - **Scalability**: Multiple consumers can process events in parallel
 - **Replay**: Can reprocess historical events for retraining models
@@ -289,7 +289,7 @@ for key, value in flat_event.items():
 
 **Pitfalls**:
 - **Name collisions**: If keys at different levels have same name, they'll collide. Example: `{"user": {"id": 1}, "id": 2}` → both become `id`. Use more specific key names or include full path
-- **Array handling**: Taking only the first element loses information if arrays have multiple values. For security logs with multiple IPs or ports, consider extracting all values or computing summary statistics (min/max/count)
+- **Array handling**: Taking only the first element loses information if arrays have multiple values. For observability logs with multiple IPs or ports, consider extracting all values or computing summary statistics (min/max/count)
 - **Explosion of features**: Deep nesting creates many features. A 5-level nested object can produce 50+ flattened keys. Filter to only useful fields after flattening
 
 **Further processing needed**: After flattening, you'll have 100-300 fields. Next step is feature selection to choose the 20-50 most informative ones.
@@ -307,22 +307,22 @@ for key, value in flat_event.items():
 Starting with 20-50 core features keeps the model focused and reduces overfitting.
 
 **How to choose**:
-1. **Domain knowledge**: Security experts know which fields matter (user_id, IP addresses, status codes)
+1. **Domain knowledge**: Operations experts know which fields matter (user_id, IP addresses, status codes)
 2. **Data exploration**: Check which fields have non-null values >90% of the time
 3. **Tree-based importance**: Train Random Forest on sample data and rank features by importance score (see [Tree-Based Feature Importance](/ai-eng/ml-algorithms/tree_based_feature_importance.md) for detailed guide)
 
-**LLM-assisted feature selection**: If you lack security domain expertise, use an LLM to recommend features based on your use case:
+**LLM-assisted feature selection**: If you lack observability domain expertise, use an LLM to recommend features based on your use case:
 
 <details>
 <summary><strong>Click to see LLM prompt template</strong></summary>
 
 ```
-I'm building an anomaly detection system for OCSF (Open Cybersecurity Schema Framework) security logs.
+I'm building an anomaly detection system for OCSF (Open Cybersecurity Schema Framework) observability logs.
 I need to select 20-50 most informative features from the 300+ available OCSF fields.
 
 My specific use case:
-- [Describe your use case: e.g., "Detect compromised user accounts", "Identify data exfiltration",
-  "Monitor API access patterns", "Detect brute force attacks"]
+- [Describe your use case: e.g., "Detect service degradation", "Identify unusual traffic patterns",
+  "Monitor API access patterns", "Detect configuration drift"]
 
 My data sources:
 - [List your log sources: e.g., "AWS CloudTrail logs", "Okta authentication events",
@@ -338,16 +338,16 @@ Based on this use case, please recommend:
 Example OCSF schema reference: https://schema.ocsf.io/
 ```
 
-**Example response** (for detecting compromised accounts):
+**Example response** (for detecting service issues):
 ```
 Recommended features:
-1. actor.user.uid (categorical) - Track which user account
+1. actor.user.uid (categorical) - Track which user/service account
 2. status_id (categorical) - Success/failure patterns
-3. src_endpoint.ip (categorical, hashed) - Login locations
+3. src_endpoint.ip (categorical, hashed) - Request origins
 4. time (numerical) - Extract hour_of_day, day_of_week
-5. Failed_login_count_1h (derived, numerical) - Brute force indicator
-6. unique_ip_count_24h (derived, numerical) - Account sharing indicator
-7. geo_distance_from_prev (derived, numerical) - Impossible travel detection
+5. Failed_request_count_1h (derived, numerical) - Error rate indicator
+6. unique_ip_count_24h (derived, numerical) - Traffic pattern indicator
+7. response_latency_change (derived, numerical) - Performance degradation detection
 ...
 ```
 </details>
@@ -399,8 +399,8 @@ print("Numerical features:", num_features)
 **What we're doing**: Extracting time-based patterns from Unix timestamps.
 
 **Why**: Temporal patterns are critical for anomaly detection because:
-- **Normal behavior varies by time**: Logins at 3 AM are suspicious, but normal at 9 AM
-- **Attack patterns have timing**: Brute force attacks happen rapidly; data exfiltration often happens off-hours
+- **Normal behavior varies by time**: Requests at 3 AM might be unusual, while 9 AM is expected high traffic
+- **Anomaly patterns have timing**: Error bursts happen rapidly; resource exhaustion often builds over hours
 - **Cyclical patterns matter**: Monday mornings have different traffic than Sunday nights
 
 **Types of temporal features**:
@@ -497,8 +497,8 @@ for key, value in temporal.items():
 
 **Why**: Raw OCSF fields often need transformation to be useful:
 - **Rates matter more than totals**: `bytes_per_second` is more informative than raw `bytes` value
-- **Ratios reveal patterns**: `upload_ratio` (upload/total) can detect data exfiltration
-- **Domain features**: Extracting TLD from URLs can reveal phishing (unusual TLDs like `.tk`, `.ru`)
+- **Ratios reveal patterns**: `upload_ratio` (upload/total) can detect unusual data transfer patterns
+- **Domain features**: Extracting TLD from URLs can reveal unusual external dependencies
 
 **Examples**:
 - Network transfer rates: `bytes_per_second = total_bytes / duration`
@@ -581,8 +581,8 @@ for key, value in derived.items():
 **What we're doing**: Computing statistics over recent events (rolling windows) to capture behavioral patterns.
 
 **Why this is critical for anomaly detection**:
-- **Single events lack context**: One failed login is normal; 50 in 10 minutes is a brute force attack
-- **Behavioral baselines**: How many events does this user normally generate per hour?
+- **Single events lack context**: One failed request is normal; 50 in 10 minutes indicates a problem
+- **Behavioral baselines**: How many events does this user/service normally generate per hour?
 - **Velocity features**: Rapid changes in behavior (e.g., sudden spike in data transfer) are anomalies
 
 **How it works**:
@@ -690,20 +690,20 @@ for event in events:
 ```
 
 **Aggregation features are powerful for anomaly detection**:
-- Sudden spike in failed logins → Brute force attack
-- Many unique IPs from one user → Compromised account
-- Unusual bytes transferred → Data exfiltration
+- Sudden spike in failed requests → Service degradation or misconfiguration
+- Many unique IPs from one user → Traffic pattern change
+- Unusual bytes transferred → Workload anomaly
 
 **Pitfalls**:
 - **Cold start problem**: First event for a user has no history. Aggregations return 0, which may be flagged as anomalous. Solution: Have a "warm-up period" or special handling for new users
 - **Memory growth**: Tracking millions of users indefinitely exhausts memory. Solution: Periodically purge inactive users (no events in N hours), or use external state store (Redis) for production
 - **Out-of-order events**: If events arrive out of timestamp order (common with distributed systems), aggregations may be incorrect. Solution: Buffer events and sort by timestamp before processing, or use a stateless approach (query from database)
-- **Window size choice**: Too small (5 minutes) → noisy, too large (24 hours) → misses short attacks. Start with 60 minutes for most security use cases
+- **Window size choice**: Too small (5 minutes) → noisy, too large (24 hours) → misses transient issues. Start with 60 minutes for most observability use cases
 
 **Further processing**: For production systems processing millions of events:
 - **Use external state**: Store user aggregations in Redis with TTL (time-to-live) instead of in-memory dictionaries
 - **Batch processing**: For training data, precompute aggregations in Spark/Dask rather than streaming aggregator
-- **Multiple windows**: Compute 1h, 4h, and 24h aggregations to capture different attack timescales
+- **Multiple windows**: Compute 1h, 4h, and 24h aggregations to capture different anomaly timescales
 
 ---
 
