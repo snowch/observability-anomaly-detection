@@ -156,6 +156,21 @@ print("  - Look for clear cluster separation")
 print("  - Anomalies should be outliers or in sparse regions")
 ```
 
+**Interpreting this visualization**: This example uses simulated data with a fixed random seed, so you'll always see the same pattern:
+
+- **Classes 0, 1, 2** (blue, red, pink): Three distinct clusters representing different "normal" event types. In real OCSF data, these might be successful logins, file access events, and network connections.
+- **Class 3** (cyan): Scattered points representing anomalies. Notice they're more dispersed and positioned away from the tight normal clusters.
+
+**What this demonstrates**:
+- Good embeddings produce **tight, well-separated clusters** for normal behavior
+- Anomalies appear as **outliers** or in **sparse regions** between clusters
+- The clear separation here is idealized—real embeddings will have more overlap
+
+**When analyzing your own embeddings**, ask:
+1. Do you see distinct clusters? (If not, embeddings may not have learned meaningful structure)
+2. Are the clusters interpretable? (Can you map them to event types?)
+3. Where are your known anomalies? (They should be outliers, not mixed into normal clusters)
+
 #### UMAP: Focus on Global Structure
 
 **What is UMAP?** Uniform Manifold Approximation and Projection preserves both local and global structure better than t-SNE. Generally faster and more scalable.
@@ -221,9 +236,16 @@ def visualize_embeddings_umap(embeddings, labels=None, title="Embedding Space (U
     plt.tight_layout()
     return fig
 
-print("UMAP visualization function defined")
-print("Usage: visualize_embeddings_umap(embeddings, labels)")
+# Run UMAP on the same simulated data
+fig = visualize_embeddings_umap(all_embeddings, labels, title="OCSF Embeddings (UMAP)")
+if fig is not None:
+    plt.show()
+    print("✓ UMAP visualization complete")
+    print("  - Compare with t-SNE above: UMAP preserves global distances better")
+    print("  - Clusters should appear in similar positions but with different shapes")
 ```
+
+**Comparing t-SNE vs UMAP on the same data**: Notice how UMAP tends to preserve the relative distances between clusters better than t-SNE. If Cluster A and Cluster B are far apart in the original 256-dim space, UMAP will keep them far apart in 2D. t-SNE may distort these global distances while preserving local neighborhoods.
 
 #### Choosing Between t-SNE and UMAP
 
@@ -263,7 +285,7 @@ Visualization shows overall structure, but you need to zoom in and check if indi
 <!-- [Image: Diagram showing a query embedding with arrows pointing to its top-5 neighbors, with semantic labels showing whether neighbors are correctly similar] -->
 
 ```{code-cell}
-def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, k=10):
+def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, query_record=None, k=10):
     """
     Find and display the k nearest neighbors for a query embedding.
 
@@ -271,6 +293,7 @@ def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, k=10
         query_embedding: Single embedding vector (embedding_dim,)
         all_embeddings: All embeddings (num_samples, embedding_dim)
         all_records: List of original OCSF records (for display)
+        query_record: The query record (for display) - helps verify neighbors make sense
         k: Number of neighbors to return
 
     Returns:
@@ -293,6 +316,11 @@ def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, k=10
     print("\n" + "="*60)
     print("NEAREST NEIGHBOR INSPECTION")
     print("="*60)
+
+    # Print query record first so we know what we're looking for
+    if query_record is not None:
+        print(f"\nQUERY RECORD: {query_record}")
+        print("-"*60)
 
     for rank, idx in enumerate(top_k_indices, 1):
         sim = similarities[idx]
@@ -328,6 +356,7 @@ neighbors, sims = inspect_nearest_neighbors(
     simulated_embeddings[0],
     simulated_embeddings,
     simulated_records,
+    query_record=simulated_records[0],  # Show what we're querying for
     k=5
 )
 
@@ -358,6 +387,43 @@ print("✗ Bad: If record 4 (failure) appeared as top neighbor, model confused s
    - ✅ Good: User A's logins are neighbors with each other, not User B's
    - ❌ Bad: All users look identical
 
+#### Handling High-Dimensional Records
+
+Real OCSF records often have dozens of fields, making visual comparison difficult. Strategies to make inspection tractable:
+
+**1. Focus on key fields**: Define a small set of "critical fields" for your use case:
+```python
+CRITICAL_FIELDS = ['activity_id', 'status', 'user_id', 'severity']
+
+def summarize_record(record):
+    """Extract only the fields that matter for comparison."""
+    return {k: record.get(k) for k in CRITICAL_FIELDS if k in record}
+```
+
+**2. Compute field-level agreement**: Instead of eyeballing, quantify how many key fields match:
+```python
+def field_agreement(query, neighbor, fields=CRITICAL_FIELDS):
+    """Return fraction of critical fields that match."""
+    matches = sum(1 for f in fields if query.get(f) == neighbor.get(f))
+    return matches / len(fields)
+```
+
+**3. Flag semantic violations**: Automatically detect when neighbors violate critical distinctions:
+```python
+def check_semantic_violations(query, neighbors):
+    """Flag neighbors that differ on critical security fields."""
+    violations = []
+    for neighbor in neighbors:
+        if query['status'] != neighbor['status']:  # e.g., success vs failure
+            violations.append(f"Status mismatch: {query['status']} vs {neighbor['status']}")
+    return violations
+```
+
+**4. Sample strategically**: Don't just pick random queries—test edge cases:
+- One sample from each cluster
+- Known anomalies (do their neighbors look anomalous?)
+- Boundary cases (records near cluster edges)
+
 #### Common Failures Caught by Neighbor Inspection
 
 - Model treats all failed login attempts as identical (ignores failed password vs account locked)
@@ -384,11 +450,37 @@ Now we move from subjective "looking" to objective scoring. These metrics give y
 
 Three complementary metrics measure how well your embeddings form distinct clusters:
 
-<!-- [Image: Visual explanation of Silhouette Score showing intra-cluster distance (a) vs inter-cluster distance (b) for a single point] -->
-
 #### Silhouette Score
 
 **What it measures**: How similar each point is to its own cluster (cohesion) vs other clusters (separation).
+
+**Visual intuition**:
+
+```
+        Cluster A                    Cluster B
+      ┌─────────────┐              ┌─────────────┐
+      │   o   o     │              │     x   x   │
+      │  o  ●  o    │ ──── b ────► │   x   x     │
+      │   o   o     │              │     x   x   │
+      └─────────────┘              └─────────────┘
+           │
+           │ a = avg distance to
+           │     points in same cluster
+           ▼
+        (small a = tight cluster = GOOD)
+
+    ● = the point we're measuring
+    o = other points in same cluster (used to compute 'a')
+    x = points in nearest other cluster (used to compute 'b')
+
+    Silhouette = (b - a) / max(a, b)
+
+    If b >> a: point is well-placed → score near +1 (GOOD)
+    If a >> b: point is misplaced  → score near -1 (BAD)
+    If a ≈ b:  point is on boundary → score near 0
+```
+
+**Memory aid**: "**S**ilhouette = **S**eparation minus cohesion". High score means your point is **far from other clusters** (high b) and **close to its own cluster** (low a).
 
 **Range**: -1 to +1
 
