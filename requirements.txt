@@ -6,6 +6,9 @@ matplotlib
 scikit-learn
 torch --index-url https://download.pytorch.org/whl/cpu
 
+# UMAP for embedding visualization (Part 5)
+umap-learn
+
 # MLflow for model versioning (Part 7)
 mlflow
 

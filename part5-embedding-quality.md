@@ -186,8 +186,7 @@ print("  - Anomalies should be outliers or in sparse regions")
 - **Reproducibility**: UMAP plots are more consistent across runs
 
 ```{code-cell}
-# Note: UMAP requires installation: pip install umap-learn
-# This is a code example (not executed in the tutorial)
+import umap
 
 def visualize_embeddings_umap(embeddings, labels=None, title="Embedding Space (UMAP)", n_neighbors=15):
     """
@@ -202,12 +201,6 @@ def visualize_embeddings_umap(embeddings, labels=None, title="Embedding Space (U
     Returns:
         matplotlib figure
     """
-    try:
-        import umap
-    except ImportError:
-        print("UMAP not installed. Install with: pip install umap-learn")
-        return None
-
     # Run UMAP
     reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1, random_state=42)
     embeddings_2d = reducer.fit_transform(embeddings)
@@ -238,11 +231,10 @@ def visualize_embeddings_umap(embeddings, labels=None, title="Embedding Space (U
 
 # Run UMAP on the same simulated data
 fig = visualize_embeddings_umap(all_embeddings, labels, title="OCSF Embeddings (UMAP)")
-if fig is not None:
-    plt.show()
-    print("✓ UMAP visualization complete")
-    print("  - Compare with t-SNE above: UMAP preserves global distances better")
-    print("  - Clusters should appear in similar positions but with different shapes")
+plt.show()
+print("✓ UMAP visualization complete")
+print("  - Compare with t-SNE above: UMAP preserves global distances better")
+print("  - Clusters should appear in similar positions but with different shapes")
 ```
 
 **Comparing t-SNE vs UMAP on the same data**: Notice how UMAP tends to preserve the relative distances between clusters better than t-SNE. If Cluster A and Cluster B are far apart in the original 256-dim space, UMAP will keep them far apart in 2D. t-SNE may distort these global distances while preserving local neighborhoods.
