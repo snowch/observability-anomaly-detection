@@ -84,30 +84,104 @@ Two techniques help us visualize high-dimensional embedding spaces in 2D:
 
 **Visual intuition for perplexity**:
 
-```
-Original high-dimensional space (3 clusters: A, B, C where A is close to B, far from C)
+```{code-cell}
+# Visualize how perplexity affects t-SNE's local vs global structure preservation
+fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
 
-    A-cluster    B-cluster                    C-cluster
-    ┌───────┐    ┌───────┐                    ┌───────┐
-    │ • • • │    │ x x x │                    │ o o o │
-    │ • • • │    │ x x x │                    │ o o o │
-    └───────┘    └───────┘                    └───────┘
-         └──close──┘                               │
-              └────────────── far ─────────────────┘
+np.random.seed(42)
 
-┌──────────────────────────────────────────────────────────────────┐
-│  LOW PERPLEXITY (5)               HIGH PERPLEXITY (50)           │
-│  "Who are my immediate            "How does my cluster relate    │
-│   neighbors?"                      to ALL other clusters?"       │
-│                                                                  │
-│       o o                          • •      x x            o o   │
-│    • •    x x                       • •      x x            o o  │
-│   • •      x x   o o                                             │
-│                                    A close   B close      C far  │
-│   Tight clusters, but             Clusters spread out but        │
-│   C appears close to A/B          preserve global distances:     │
-│   (WRONG global structure)        A-B close, C far (CORRECT)     │
-└──────────────────────────────────────────────────────────────────┘
+# Original high-dimensional structure: A close to B, both far from C
+# Create synthetic data that mimics this
+n_per_cluster = 30
+cluster_A = np.random.randn(n_per_cluster, 50) * 0.5 + np.array([0, 0] + [0]*48)
+cluster_B = np.random.randn(n_per_cluster, 50) * 0.5 + np.array([2, 0] + [0]*48)  # Close to A
+cluster_C = np.random.randn(n_per_cluster, 50) * 0.5 + np.array([10, 0] + [0]*48)  # Far from A and B
+
+data = np.vstack([cluster_A, cluster_B, cluster_C])
+cluster_labels = np.array(['A']*n_per_cluster + ['B']*n_per_cluster + ['C']*n_per_cluster)
+colors = {'A': '#3498db', 'B': '#e74c3c', 'C': '#2ecc71'}
+
+# Panel 1: Original high-dimensional structure (conceptual 1D projection)
+ax = axes[0]
+ax.set_xlim(-2, 16)
+ax.set_ylim(-2, 2)
+
+# Draw clusters as ellipses with labels
+from matplotlib.patches import Ellipse, FancyArrowPatch
+
+for cx, label, color in [(0, 'A', '#3498db'), (2, 'B', '#e74c3c'), (10, 'C', '#2ecc71')]:
+    ellipse = Ellipse((cx, 0), 1.5, 1.2, facecolor=color, alpha=0.3, edgecolor=color, linewidth=2)
+    ax.add_patch(ellipse)
+    # Add points inside
+    pts_x = np.random.randn(8) * 0.3 + cx
+    pts_y = np.random.randn(8) * 0.25
+    ax.scatter(pts_x, pts_y, c=color, s=40, alpha=0.8, edgecolors='white', linewidth=0.5)
+    ax.text(cx, -1.4, label, ha='center', fontsize=14, fontweight='bold', color=color)
+
+# Draw distance annotations
+ax.annotate('', xy=(1.8, 0.9), xytext=(0.2, 0.9),
+            arrowprops=dict(arrowstyle='<->', color='#555', lw=1.5))
+ax.text(1, 1.15, 'close', ha='center', fontsize=10, color='#555')
+
+ax.annotate('', xy=(9.5, -0.9), xytext=(2.5, -0.9),
+            arrowprops=dict(arrowstyle='<->', color='#555', lw=1.5))
+ax.text(6, -0.65, 'far', ha='center', fontsize=10, color='#555')
+
+ax.set_title('Original High-Dimensional Space', fontsize=12, fontweight='bold', pad=10)
+ax.set_xticks([])
+ax.set_yticks([])
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.spines['bottom'].set_visible(False)
+ax.spines['left'].set_visible(False)
+
+# Panel 2: Low perplexity t-SNE
+ax = axes[1]
+tsne_low = TSNE(n_components=2, perplexity=5, random_state=42, max_iter=1000)
+emb_low = tsne_low.fit_transform(data)
+
+for label in ['A', 'B', 'C']:
+    mask = cluster_labels == label
+    ax.scatter(emb_low[mask, 0], emb_low[mask, 1], c=colors[label], s=50,
+               alpha=0.8, edgecolors='white', linewidth=0.5, label=f'Cluster {label}')
+
+ax.set_title('Low Perplexity (5)\n"Who are my immediate neighbors?"', fontsize=12, fontweight='bold')
+ax.set_xlabel('t-SNE dim 1', fontsize=10)
+ax.set_ylabel('t-SNE dim 2', fontsize=10)
+ax.legend(loc='best', fontsize=9)
+ax.grid(True, alpha=0.3)
+
+# Add annotation about the problem
+ax.text(0.5, -0.12, 'Tight clusters, but global\ndistances may be distorted',
+        transform=ax.transAxes, ha='center', fontsize=9, style='italic', color='#666')
+
+# Panel 3: High perplexity t-SNE
+ax = axes[2]
+tsne_high = TSNE(n_components=2, perplexity=50, random_state=42, max_iter=1000)
+emb_high = tsne_high.fit_transform(data)
+
+for label in ['A', 'B', 'C']:
+    mask = cluster_labels == label
+    ax.scatter(emb_high[mask, 0], emb_high[mask, 1], c=colors[label], s=50,
+               alpha=0.8, edgecolors='white', linewidth=0.5, label=f'Cluster {label}')
+
+ax.set_title('High Perplexity (50)\n"How does my cluster relate to all others?"', fontsize=12, fontweight='bold')
+ax.set_xlabel('t-SNE dim 1', fontsize=10)
+ax.set_ylabel('t-SNE dim 2', fontsize=10)
+ax.legend(loc='best', fontsize=9)
+ax.grid(True, alpha=0.3)
+
+# Add annotation about the benefit
+ax.text(0.5, -0.12, 'Better preservation of\nglobal cluster relationships',
+        transform=ax.transAxes, ha='center', fontsize=9, style='italic', color='#666')
+
+plt.tight_layout()
+plt.show()
+
+print("KEY INSIGHT:")
+print("  - Low perplexity: Focuses on local neighborhoods (tight clusters)")
+print("  - High perplexity: Considers global structure (cluster relationships)")
+print("  - For anomaly detection: Start with perplexity=30, adjust based on dataset size")
 ```
 
 **Rule of thumb**: perplexity should be smaller than your number of samples. For 1000 samples, try perplexity 5-50.
