@@ -735,6 +735,8 @@ Three complementary metrics measure how well your embeddings form distinct clust
 **For OCSF observability data**: Target Silhouette > 0.5 for production deployment.
 
 ```{code-cell}
+:tags: [hide-input]
+
 from sklearn.metrics import silhouette_score, silhouette_samples
 from sklearn.cluster import KMeans
 
