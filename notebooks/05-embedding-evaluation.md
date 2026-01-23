@@ -114,6 +114,8 @@ print(f"✓ No Inf values: {not np.isinf(embeddings).any()}")
 - ❌ **Bad**: All points in one giant blob (no structure learned)
 - ❌ **Bad**: Random scatter with no clusters
 
+**Note on coloring**: Since our embeddings come from self-supervised learning (unsupervised), we don't have ground truth class labels. The left plot shows raw structure; the right plot uses embedding norm as an anomaly indicator. Compare with Part 5's labeled synthetic examples for educational context.
+
 **Perplexity parameter**: Controls balance between local and global structure
 - Low (5-15): Focus on local neighborhoods
 - Medium (30): Default, balanced view
