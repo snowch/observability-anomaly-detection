@@ -85,6 +85,14 @@ Two techniques help us visualize high-dimensional embedding spaces in 2D:
 **Visual intuition for perplexity**:
 
 ```{code-cell}
+:tags: [hide-input]
+
+# Required imports for this visualization
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from matplotlib.patches import Ellipse
+
 # Visualize how perplexity affects t-SNE's local vs global structure preservation
 fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
 
@@ -107,8 +115,6 @@ ax.set_xlim(-2, 16)
 ax.set_ylim(-2, 2)
 
 # Draw clusters as ellipses with labels
-from matplotlib.patches import Ellipse, FancyArrowPatch
-
 for cx, label, color in [(0, 'A', '#3498db'), (2, 'B', '#e74c3c'), (10, 'C', '#2ecc71')]:
     ellipse = Ellipse((cx, 0), 1.5, 1.2, facecolor=color, alpha=0.3, edgecolor=color, linewidth=2)
     ax.add_patch(ellipse)
