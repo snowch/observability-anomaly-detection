@@ -15,6 +15,9 @@ mlflow
 # FAISS for vector similarity search (Part 9)
 faiss-cpu
 
+# DoWhy for causal inference RCA (Part 9)
+dowhy
+
 # Kafka for streaming examples (Part 7, Part 9)
 kafka-python
 
