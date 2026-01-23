@@ -202,10 +202,6 @@ ax.set_ylabel('t-SNE dim 2', fontsize=10)
 ax.legend(loc='best', fontsize=9)
 ax.grid(True, alpha=0.3)
 
-# Add annotation about the problem
-ax.text(0.5, -0.12, 'Tight clusters, but global\ndistances may be distorted',
-        transform=ax.transAxes, ha='center', fontsize=9, style='italic', color='#666')
-
 # Panel 3: High perplexity t-SNE
 ax = axes[2]
 tsne_high = TSNE(n_components=2, perplexity=50, random_state=42, max_iter=1000)
@@ -222,22 +218,37 @@ ax.set_ylabel('t-SNE dim 2', fontsize=10)
 ax.legend(loc='best', fontsize=9)
 ax.grid(True, alpha=0.3)
 
-# Add annotation about the benefit
-ax.text(0.5, -0.12, 'Better preservation of\nglobal cluster relationships',
-        transform=ax.transAxes, ha='center', fontsize=9, style='italic', color='#666')
-
 plt.tight_layout()
 plt.show()
 
-print("KEY INSIGHT:")
-print("  - Low perplexity: Focuses on local neighborhoods (tight clusters)")
-print("  - High perplexity: Considers global structure (cluster relationships)")
-print("  - For anomaly detection: Start with perplexity=30, adjust based on dataset size")
+print("="*70)
+print("READING THIS VISUALIZATION")
+print("="*70)
+print()
+print("LEFT PANEL (Original Space):")
+print("  • Shows the TRUE relationships: A is close to B, both are far from C")
+print("  • This is what we want t-SNE to preserve")
+print()
+print("MIDDLE PANEL (Low Perplexity = 5):")
+print("  • Each point only 'looks at' ~5 neighbors")
+print("  • Result: Tight, well-separated clusters (good for local structure)")
+print("  • Problem: Global distances are distorted—C may not look 'far' from A/B")
+print()
+print("RIGHT PANEL (High Perplexity = 50):")
+print("  • Each point 'looks at' ~50 neighbors (more global view)")
+print("  • Result: Better preservation of cluster relationships")
+print("  • C should appear farther from A/B, matching the original space")
+print()
+print("KEY TAKEAWAY: Start with perplexity=30, adjust based on what you need:")
+print("  • Lower (5-15): Finding tight local clusters")
+print("  • Higher (50+): Understanding global structure")
 ```
 
 **Rule of thumb**: perplexity should be smaller than your number of samples. For 1000 samples, try perplexity 5-50.
 
 ```{code-cell}
+:tags: [hide-input]
+
 import logging
 import warnings
 
@@ -337,6 +348,8 @@ Beyond clustering structure, the **magnitude (L2 norm)** of embeddings can revea
 Models often produce embeddings with unusual norms for inputs that differ from training data.
 
 ```{code-cell}
+:tags: [hide-input]
+
 # Dual visualization: structure + embedding norm
 fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
@@ -405,6 +418,8 @@ print("  ✗ If norms are uniform everywhere, norm isn't a useful indicator")
 - **Reproducibility**: UMAP plots are more consistent across runs
 
 ```{code-cell}
+:tags: [hide-input]
+
 import warnings
 warnings.filterwarnings("ignore", message="n_jobs value")
 
@@ -720,6 +735,8 @@ Three complementary metrics measure how well your embeddings form distinct clust
 **For OCSF observability data**: Target Silhouette > 0.5 for production deployment.
 
 ```{code-cell}
+:tags: [hide-input]
+
 from sklearn.metrics import silhouette_score, silhouette_samples
 from sklearn.cluster import KMeans
 
@@ -841,6 +858,8 @@ Use for relative comparison between models—no fixed threshold.
 How many natural groupings exist in your OCSF data? Use multiple metrics together to find the answer.
 
 ```{code-cell}
+:tags: [hide-input]
+
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
 
 def comprehensive_cluster_metrics(embeddings, n_clusters_range=range(2, 10)):
@@ -1051,6 +1070,8 @@ All previous metrics are proxies. The ultimate test is: do these embeddings actu
 | < 0.70 | Poor—embeddings don't capture class distinctions |
 
 ```{code-cell}
+:tags: [hide-input]
+
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score
 
