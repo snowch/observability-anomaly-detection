@@ -450,7 +450,7 @@ When preparing OCSF data for TabularResNet, you'll need to address several key d
 
 ### Adapting to Other Observability Data
 
-While this series uses OCSF security logs, the same architecture works for any structured
+While this series uses OCSF observability logs, the same architecture works for any structured
 observability data. Here's how to adapt the feature selection for different data types:
 
 **Telemetry/Metrics Data:**

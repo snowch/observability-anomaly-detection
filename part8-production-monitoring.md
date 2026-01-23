@@ -54,14 +54,14 @@ Before diving into monitoring techniques, understand these critical limitations 
 
 ### 1. Poisoned Baseline Risk ("Cold Start Problem")
 
-**The risk**: Your embedding model learns what's "normal" from historical data. If that data already contains undetected attacks or anomalies, you'll *normalize* malicious behavior.
+**The risk**: Your embedding model learns what's "normal" from historical data. If that data already contains undetected anomalies or degraded states, you'll *normalize* problematic behavior.
 
-**Example**: If an attacker had persistent access for 3 months before you deployed this system, their activity patterns become part of your "normal" baseline.
+**Example**: If a service had a slow memory leak for 3 months before you deployed this system, that degraded performance becomes part of your "normal" baseline.
 
 **Mitigations**:
-- **Clean set validation**: Have analysts manually verify a sample of training data is genuinely normal
+- **Clean set validation**: Have operators manually verify a sample of training data is genuinely healthy
 - **Active learning loop**: Flag uncertain predictions for human review and incorporate feedback
-- **Honeypot injection**: Include known-bad synthetic events in training to ensure they're detected
+- **Known-bad injection**: Include synthetic anomalous events in training to ensure they're detected
 - **Gradual trust**: Start with high-sensitivity thresholds and relax them as you gain confidence
 
 ### 2. Cost vs. Coverage Trade-off
@@ -92,9 +92,9 @@ Before diving into monitoring techniques, understand these critical limitations 
 
 ### 4. Temporal Blindness (Single-Event Focus)
 
-**The risk**: Basic embedding approaches score each event independently. They miss slow-burn attacks that look normal event-by-event but are anomalous as a sequence.
+**The risk**: Basic embedding approaches score each event independently. They miss slow-developing issues that look normal event-by-event but are anomalous as a sequence.
 
-**Example**: An attacker making one login attempt per hour for a week won't trigger single-event detection, but the pattern is clearly suspicious.
+**Example**: A gradual memory leak causing one timeout per hour for a week won't trigger single-event detection, but the pattern clearly indicates a problem.
 
 **Mitigations**:
 - **Sequence models**: Use LSTM or attention over embedding sequences (covered in Part 6)
@@ -103,7 +103,7 @@ Before diving into monitoring techniques, understand these critical limitations 
 
 ---
 
-**Bottom line**: Embedding-based anomaly detection is powerful but not magic. Use it as *one layer* in a defense-in-depth strategy, not as your only detection mechanism.
+**Bottom line**: Embedding-based anomaly detection is powerful but not magic. Use it as *one layer* in a comprehensive observability strategy, not as your only detection mechanism.
 
 ---
 

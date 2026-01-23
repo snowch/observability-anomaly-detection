@@ -244,7 +244,7 @@ We augment tabular data by:
 1. **Numerical**: Add small Gaussian noise (~15%)
 2. **Categorical**: Random dropout (~20%) - replace with random value
 
-**What we DON'T augment**: Security-critical fields like `status`, `severity_id`, `activity_id` ideally shouldn't be heavily augmented (we use light augmentation here for simplicity).
+**What we DON'T augment**: Operationally-critical fields like `status`, `severity_id`, `activity_id` ideally shouldn't be heavily augmented (we use light augmentation here for simplicity).
 
 ```{code-cell}
 class TabularAugmentation:

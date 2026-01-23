@@ -19,9 +19,9 @@ bibliography:
 
 ---
 
-In Parts 1-8, we built an anomaly detection system for a single data source (OCSF security logs). However, advanced production observability often requires correlating anomalies across **multiple data sources** to identify root causes:
+In Parts 1-8, we built an anomaly detection system for a single data source (OCSF observability logs). However, advanced production observability often requires correlating anomalies across **multiple data sources** to identify root causes:
 
-- **Logs**: Application errors, security events, audit trails
+- **Logs**: Application errors, system events, audit trails
 - **Metrics**: CPU usage, memory, latency, error rates
 - **Traces**: Distributed transaction spans, service dependencies
 - **Configuration**: Deployment events, config changes, feature flags
@@ -1145,7 +1145,7 @@ print("AgenticRCAInvestigator class defined")
 print("This agent uses a ReAct loop to validate root cause hypotheses")
 ```
 
-#### Example: Agent Investigating a Security Incident
+#### Example: Agent Investigating a Service Incident
 
 Let's see how the agent handles a complex incident where temporal correlation alone would give false positives:
 
@@ -1380,8 +1380,8 @@ detect_multi_step_operational_failure([])
 **1. No Training Required**
 ```python
 # LSTM approach:
-# - Need 1000s of labeled attack sequences
-# - Retrain when attack patterns evolve
+# - Need 1000s of labeled anomaly sequences
+# - Retrain when anomaly patterns evolve
 # - Separate model to maintain
 
 # Agentic approach:

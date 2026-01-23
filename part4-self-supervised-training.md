@@ -19,7 +19,7 @@ Learn how to train TabularResNet on unlabelled OCSF data using self-supervised l
 
 ## What is Self-Supervised Learning?
 
-**The challenge**: You have millions of OCSF security logs but no labels telling you which are "normal" vs "anomalous". Traditional supervised learning requires labeled data (e.g., "this event is malicious"), which is expensive and often unavailable for new anomaly types.
+**The challenge**: You have millions of OCSF observability logs but no labels telling you which are "normal" vs "anomalous". Traditional supervised learning requires labeled data (e.g., "this event is anomalous"), which is expensive and often unavailable for new anomaly types.
 
 **The solution**: **Self-supervised learning** creates training tasks automatically from the data itself, without human labels. The model learns useful representations by solving these artificial tasks.
 
@@ -393,7 +393,7 @@ print("Use contrastive_loss() with your TabularResNet model for self-supervised 
 
 - **dropout_prob** (default 0.2): Probability of swapping categorical values
   - Higher values create more diverse augmentations but risk semantic changes
-  - For security logs, keep low (0.1-0.2) to avoid changing event meaning
+  - For observability logs, keep low (0.1-0.2) to avoid changing event meaning
 
 - **temperature** (default 0.07): Controls similarity scaling
   - Lower (0.01) → sharper gradients, model focuses on hardest negatives
@@ -403,12 +403,12 @@ print("Use contrastive_loss() with your TabularResNet model for self-supervised 
 **Pitfalls**:
 - **Batch size matters**: Contrastive learning needs large batches (256-1024) to provide enough negative samples. Small batches (32) don't work well - model has too few negatives to learn from
 - **GPU memory**: Large batches require lots of memory. If OOM, use gradient accumulation or reduce model size
-- **Augmentation quality**: Bad augmentations break contrastive learning by creating false positive pairs. For OCSF security data, this is critical:
+- **Augmentation quality**: Bad augmentations break contrastive learning by creating false positive pairs. For OCSF observability data, this is critical:
 
   **Why this matters**: The model learns that "these two augmented views are the same event." If augmentation changes the semantic meaning, you're teaching the model that fundamentally different events are similar.
 
   **What NOT to augment**:
-  - ❌ **Security outcomes**: Don't swap `status: success` ↔ `status: failure` (completely different event types)
+  - ❌ **Operational outcomes**: Don't swap `status: success` ↔ `status: failure` (completely different event types)
   - ❌ **Event types**: Don't change `activity_id` or `class_uid` (these define what happened)
   - ❌ **Critical identifiers**: Be careful with `user_id`, `src_endpoint.ip`, `dst_endpoint.ip` (swapping creates wrong associations)
   - ❌ **Severity levels**: Don't change `severity` or `risk_level` (changes event importance)
@@ -417,7 +417,7 @@ print("Use contrastive_loss() with your TabularResNet model for self-supervised 
   - ✅ **Numerical metrics**: Add small noise to `bytes`, `duration`, `count` (±5-15%)
   - ✅ **Timestamps**: Slight time jitter (±few seconds) for `time`, `end_time`
   - ✅ **Non-critical categorical**: Randomly mask `http_request.user_agent`, `file.name` (with domain-appropriate values)
-  - ✅ **Metadata**: Change `observables.type_id`, `unmapped` fields that don't affect security meaning
+  - ✅ **Metadata**: Change `observables.type_id`, `unmapped` fields that don't affect operational meaning
 
   **Example of good vs bad augmentation**:
   ```python
@@ -1005,7 +1005,7 @@ for epoch in range(num_epochs):
 
 ## Training Best Practices
 
-**Note on Data Types**: While the examples use OCSF security logs, self-supervised learning works identically for **any structured observability data** (telemetry, traces, configs, application logs). The training pipeline (`Dataset → DataLoader → Model → Loss`) remains the same—just change the feature columns to match your data schema.
+**Note on Data Types**: While the examples use OCSF observability logs, self-supervised learning works identically for **any structured observability data** (telemetry, traces, configs, application logs). The training pipeline (`Dataset → DataLoader → Model → Loss`) remains the same—just change the feature columns to match your data schema.
 
 ### 1. Data Preprocessing
 

@@ -468,7 +468,7 @@ new_events = pd.DataFrame([
         'status': 'Failure',
         'level': 'warning',
         'service': 'auth-service',
-        'actor_user_name': 'attacker',
+        'actor_user_name': 'unknown_user',
         'http_request_method': 'POST',
         'http_request_url_path': '/login',
         'severity_id': 3,

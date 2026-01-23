@@ -13,7 +13,7 @@ kernelspec:
 
 > **Theory**: See [Part 3: Feature Engineering for OCSF Data](../part3-feature-engineering.md) for the concepts behind these techniques.
 
-This notebook demonstrates feature engineering techniques for OCSF (Open Cybersecurity Schema Framework) data.
+This notebook demonstrates feature engineering techniques for OCSF (Open Cybersecurity Schema Framework) observability data.
 
 **What you'll learn:**
 1. Loading and exploring OCSF parquet data
@@ -149,7 +149,7 @@ plt.show()
 
 Time-based patterns are **critical** for anomaly detection:
 - Logins at 3 AM are suspicious
-- Attack patterns have timing signatures
+- Anomaly patterns have timing signatures
 - Business hours vs off-hours traffic differs significantly
 
 **What you should expect:**

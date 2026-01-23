@@ -33,7 +33,7 @@ How to build, train, and deploy a **custom embedding model** (TabularResNet) spe
 ## Who This Is For
  
 - ML engineers building anomaly detection systems
-- Security engineers working with observability data
+- Operations engineers working with observability data
 - Data scientists interested in self-supervised learning
 - Anyone wanting to apply ResNet to tabular/observability data
  
@@ -73,7 +73,7 @@ Use the [Docker Compose stack](https://snowch.github.io/observability-anomaly-de
  
 ## Applicability Beyond OCSF
  
-While this series uses OCSF security logs as the running example, the TabularResNet approach applies to **any structured observability data**:
+While this series uses OCSF observability logs as the running example, the TabularResNet approach applies to **any structured observability data**:
  
 - **Telemetry/Metrics**: CPU%, memory, latency with metadata
 - **Configuration data**: Key-value pairs, settings

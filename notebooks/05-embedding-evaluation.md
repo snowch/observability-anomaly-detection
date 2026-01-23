@@ -238,7 +238,7 @@ else:
 
 ## 4. Nearest Neighbor Inspection
 
-Visualization shows overall structure, but you need to zoom in and check if individual embeddings make sense. A model might create nice-looking clusters but still confuse critical security events.
+Visualization shows overall structure, but you need to zoom in and check if individual embeddings make sense. A model might create nice-looking clusters but still confuse critical event types.
 
 **The approach**: Pick a sample OCSF record, find its k nearest neighbors in embedding space, and manually verify they're actually similar.
 
@@ -289,7 +289,7 @@ print("\n" + "="*60)
 print("WHAT TO CHECK")
 print("="*60)
 print("✓ Neighbors should have similar characteristics to query")
-print("✓ Success/failure status should match (critical for security!)")
+print("✓ Success/failure status should match (critical for operations!)")
 print("✓ Similar event types should be neighbors")
 print("✗ If failed logins are neighbors of successful ones, model needs retraining")
 ```
@@ -760,7 +760,7 @@ In this notebook, we evaluated embedding quality using a comprehensive four-phas
 
 3. **Nearest Neighbor Inspection** - Verified semantic similarity
    - Spot-checked if neighbors make sense
-   - Caught critical security distinctions (success/failure)
+   - Caught critical operational distinctions (success/failure)
 
 ### Phase 2: Quantitative Evaluation
 4. **Cluster Quality Metrics** - Objective numbers

@@ -42,7 +42,7 @@ We evaluate embeddings using a two-pronged strategy that follows the data scienc
 | **Phase 3: Robustness** | Stress testing | Perturbation stability, k-NN classification, Model comparison |
 | **Phase 4: Operational** | Production readiness | Latency, Memory, Cost trade-offs |
 
-**Why this matters for observability data**: Poor embeddings make anomaly detection fail silently. If your model thinks failed logins look similar to successful logins, it won't catch account takeover attacks. Evaluation catches these problems early.
+**Why this matters for observability data**: Poor embeddings make anomaly detection fail silently. If your model thinks failed requests look similar to successful ones, it won't catch service degradation or configuration errors. Evaluation catches these problems early.
 
 <!-- [Image: Flowchart showing the four evaluation phases as a pipeline: Inspect → Measure → Stress Test → Operationalize, with decision gates between each phase] -->
 
@@ -50,7 +50,7 @@ We evaluate embeddings using a two-pronged strategy that follows the data scienc
 
 ## 2. Phase 1: Qualitative Inspection (The "Eye Test")
 
-Before calculating metrics, visualize the high-dimensional space to catch obvious semantic failures. Numbers don't tell the whole story—a model might have a high Silhouette Score but still confuse critical security events.
+Before calculating metrics, visualize the high-dimensional space to catch obvious semantic failures. Numbers don't tell the whole story—a model might have a high Silhouette Score but still confuse critical event types (e.g., treating errors the same as successful operations).
 
 **The goal**: Project high-dimensional embeddings (e.g., 256-dim) → 2D scatter plot where you can visually inspect:
 - Do similar OCSF events cluster together?
@@ -266,7 +266,7 @@ if fig is not None:
 - ✅ **Good**: Within a cluster, points from same users/sources are close together
 - ❌ **Bad**: All points in one giant overlapping blob (no structure learned)
 - ❌ **Bad**: Random scatter with no clusters (embeddings are noise)
-- ❌ **Bad**: Successful and failed login events mixed together (critical security distinction lost)
+- ❌ **Bad**: Successful and failed events mixed together (critical operational distinction lost)
 
 **Cluster interpretation questions**:
 1. **Cluster count**: How many distinct groups? Too many tiny clusters (>10) might mean overfitting.
@@ -278,7 +278,7 @@ if fig is not None:
 
 ### 2.2 Nearest Neighbor Inspection
 
-Visualization shows overall structure, but you need to zoom in and check if individual embeddings make sense. A model might create nice-looking clusters but still confuse critical security events.
+Visualization shows overall structure, but you need to zoom in and check if individual embeddings make sense. A model might create nice-looking clusters but still confuse critical event distinctions (success vs. failure, normal load vs. overload).
 
 **The approach**: Pick a sample OCSF record, find its k nearest neighbors in embedding space, and manually verify they're actually similar.
 
@@ -375,7 +375,7 @@ print("✗ Bad: If record 4 (failure) appeared as top neighbor, model confused s
    - ✅ Good: Top 5 neighbors are all authentication events
    - ❌ Bad: Neighbors include file access, network connections
 
-2. **Similar critical fields**: For security data, check status, severity, user patterns
+2. **Similar critical fields**: For observability data, check status, severity, service patterns
    - ✅ Good: Successful login's neighbors are also successful
    - ❌ Bad: Successful and failed logins are neighbors (critical distinction lost!)
 
@@ -411,7 +411,7 @@ def field_agreement(query, neighbor, fields=CRITICAL_FIELDS):
 **3. Flag semantic violations**: Automatically detect when neighbors violate critical distinctions:
 ```python
 def check_semantic_violations(query, neighbors):
-    """Flag neighbors that differ on critical security fields."""
+    """Flag neighbors that differ on critical operational fields."""
     violations = []
     for neighbor in neighbors:
         if query['status'] != neighbor['status']:  # e.g., success vs failure
@@ -428,7 +428,7 @@ def check_semantic_violations(query, neighbors):
 
 - Model treats all failed login attempts as identical (ignores failed password vs account locked)
 - Model groups events by timestamp instead of semantic meaning
-- Model confuses high-frequency normal events with brute force attempts
+- Model confuses high-frequency normal events with anomalous bursts (retry storms, connection floods)
 
 **Action items when neighbors look wrong**:
 - Review your feature engineering (Part 3): Are you encoding the right fields?
@@ -497,7 +497,7 @@ Three complementary metrics measure how well your embeddings form distinct clust
 2. `b` = average distance to points in nearest different cluster (inter-cluster distance)
 3. Silhouette = `(b - a) / max(a, b)`
 
-**For OCSF security data**: Target Silhouette > 0.5 for production deployment.
+**For OCSF observability data**: Target Silhouette > 0.5 for production deployment.
 
 ```{code-cell}
 from sklearn.metrics import silhouette_score, silhouette_samples
@@ -577,7 +577,7 @@ plt.show()
 **Reading the silhouette plot**:
 
 1. **Red dashed line** (average): Your overall Silhouette Score
-   - **Why > 0.5 for production?** Remember that silhouette ranges from -1 to +1. A score of 0.5 means each sample is, on average, twice as close to its own cluster as to the nearest other cluster. Below 0.5, clusters start to blur together—your model may confuse similar event types. In security monitoring, misclassifying a DNS exfiltration event as normal traffic is costly.
+   - **Why > 0.5 for production?** Remember that silhouette ranges from -1 to +1. A score of 0.5 means each sample is, on average, twice as close to its own cluster as to the nearest other cluster. Below 0.5, clusters start to blur together—your model may confuse similar event types. In observability, misclassifying a service degradation event as normal operation means missing an outage before it escalates.
 
 2. **Width of each colored band**: Per-sample scores within that cluster
    - **What is "wide"?** If the horizontal bars for a cluster span more than 0.3 units (e.g., some samples at 0.2 and others at 0.8), you have inconsistent embeddings. A tight cluster would have all samples within ~0.1 of each other. Wide spread often means your cluster contains semantically different events that were grouped together.
@@ -586,7 +586,7 @@ plt.show()
    - **Why is this bad?** A negative silhouette (b < a) literally means the sample's average distance to the nearest other cluster (b) is smaller than its average distance to its own cluster (a). The math says: "this point is in the wrong place." These are either mislabeled, edge cases, or indicate your embedding model treats them differently than expected.
 
 4. **Uneven cluster sizes**: If one cluster has 500 samples and another has 50, investigate
-   - This might be fine (rare attack types vs. common auth events), or it might indicate model collapse where diverse events get lumped together. Cross-reference with your actual OCSF event type distribution.
+   - This might be fine (rare error types vs. common operational events), or it might indicate model collapse where diverse events get lumped together. Cross-reference with your actual OCSF event type distribution.
 
 #### Davies-Bouldin Index
 
@@ -606,7 +606,7 @@ plt.show()
 
 **Why it complements Silhouette**: Silhouette looks at individual samples; Davies-Bouldin looks at cluster-level separation.
 
-**For OCSF security data**: Target Davies-Bouldin < 1.0.
+**For OCSF observability data**: Target Davies-Bouldin < 1.0.
 
 #### Calinski-Harabasz Score
 
@@ -682,7 +682,7 @@ print("  - Calinski-Harabasz: Higher is better (no upper bound)")
    - k=4 gives: successful logins, failed logins, privileged access, bulk transfers → makes sense
    - k=10 gives tiny arbitrary splits → probably overfitting
 
-**For OCSF security data**: Start with k = number of event types you expect (typically 3-7 for authentication logs).
+**For OCSF observability data**: Start with k = number of event types you expect (typically 3-7 for operational logs).
 
 ---
 
@@ -754,13 +754,58 @@ def evaluate_embedding_stability(model, numerical, categorical, num_perturbation
 
     return avg_similarity, std_similarity
 
-print("Embedding stability evaluation function defined")
-print("Usage: evaluate_embedding_stability(model, numerical, categorical)")
+# For demonstration, we simulate stability testing with numpy
+# In production, you would use the function above with your trained model
+
+def simulate_stability_test(embeddings, noise_levels=[0.01, 0.05, 0.10]):
+    """
+    Simulate perturbation stability using existing embeddings.
+
+    This demonstrates the concept: we add noise to embeddings directly
+    and measure how much they change. In production, you would add noise
+    to INPUT features and re-run the model.
+    """
+    print("="*60)
+    print("PERTURBATION STABILITY TEST (Simulated)")
+    print("="*60)
+    print("\nAdding Gaussian noise to embeddings and measuring cosine similarity")
+    print("(In production: add noise to input features, re-run model inference)\n")
+
+    results = []
+    for noise_level in noise_levels:
+        # Add noise to embeddings
+        noise = np.random.randn(*embeddings.shape) * noise_level
+        perturbed = embeddings + noise
+
+        # Compute cosine similarity for each sample
+        orig_norm = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+        pert_norm = perturbed / np.linalg.norm(perturbed, axis=1, keepdims=True)
+        similarities = np.sum(orig_norm * pert_norm, axis=1)
+
+        avg_sim = similarities.mean()
+        std_sim = similarities.std()
+        results.append((noise_level, avg_sim, std_sim))
+
+        status = "✓" if avg_sim > 0.92 else ("○" if avg_sim > 0.85 else "✗")
+        print(f"Noise level {noise_level*100:4.1f}%: Similarity = {avg_sim:.3f} ± {std_sim:.3f} {status}")
+
+    print(f"\n{'='*60}")
+    print("INTERPRETATION")
+    print(f"{'='*60}")
+    print("  > 0.95: Very stable—robust to noise")
+    print("  0.85-0.95: Moderately stable—acceptable for production")
+    print("  < 0.85: Unstable—embeddings change too much with small input variations")
+    print("\nTarget for observability data: > 0.92 similarity at 5% noise level")
+
+    return results
+
+# Run stability test on our simulated embeddings
+stability_results = simulate_stability_test(all_embeddings[:600])
 ```
 
 **What if stability is too high (>0.99)?** Model might be "too smooth"—not capturing fine-grained distinctions. Check nearest neighbors to see if similar-but-different events are being confused.
 
-**For security data**: Target stability > 0.92.
+**For observability data**: Target stability > 0.92. System metrics and logs naturally have noise (network jitter, rounding), so embeddings must tolerate small variations.
 
 ---
 
@@ -1102,7 +1147,7 @@ Before deploying embeddings to production, verify all criteria across the four p
 |-------|------------------|-----------|
 | **t-SNE/UMAP Visualization** | Clear, separated clusters | All points in one blob, no structure |
 | **Nearest Neighbor Inspection** | Neighbors are semantically similar | Random unrelated events, success/failure mixed |
-| **Semantic Failure Testing** | Model distinguishes critical security events | Brute force looks like normal login |
+| **Semantic Failure Testing** | Model distinguishes critical event types | Error events look identical to successes |
 | **Cluster Interpretation** | Clusters map to known event types | Arbitrary splits, no domain meaning |
 
 #### Pre-Deployment Workflow
@@ -1110,7 +1155,7 @@ Before deploying embeddings to production, verify all criteria across the four p
 1. **Run quantitative metrics** → All thresholds passed?
 2. **Visual inspection** → Clusters make sense?
 3. **Nearest neighbor spot checks** → Pick 10 random samples, verify neighbors
-4. **Semantic failure tests** → Test edge cases (brute force, privilege escalation)
+4. **Semantic failure tests** → Test edge cases (error bursts, service degradation patterns)
 5. **Operational validation** → Latency < target, memory fits budget
 6. **Generate report** → Document all metrics for reproducibility
 7. **Test on Part 6** → Run anomaly detection algorithms, measure F1 score
@@ -1216,7 +1261,7 @@ In this part, you learned a comprehensive four-phase approach to evaluating embe
 ### Key Takeaways
 
 - **Use both qualitative and quantitative**: Numbers don't tell the whole story—you must look at the data
-- **Security-specific concerns**: Check that critical security distinctions (success/failure, privilege levels) are preserved
+- **Observability-specific concerns**: Check that critical operational distinctions (success/failure, severity levels) are preserved
 - **Production readiness**: Balance quality, latency, and cost before deploying
 - **Iterative process**: If embeddings fail evaluation, go back to Parts 3-4 (feature engineering, training)
 

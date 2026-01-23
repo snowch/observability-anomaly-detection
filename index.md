@@ -15,7 +15,7 @@ bibliography:
 
 A comprehensive 9-part tutorial series on building production-ready anomaly detection systems using ResNet embeddings for OCSF (Open Cybersecurity Schema Framework) observability data.
 
-**What you'll learn**: How to build, train, and deploy a **custom embedding model** (TabularResNet) specifically designed for OCSF observability data. This model transforms security logs and system metrics into vector representations. Anomaly detection happens entirely through vector database similarity search—no separate detection model needed. The system processes streaming OCSF events in near real-time to automatically identify unusual behavior.
+**What you'll learn**: How to build, train, and deploy a **custom embedding model** (TabularResNet) specifically designed for OCSF observability data. This model transforms observability logs and system metrics into vector representations. Anomaly detection happens entirely through vector database similarity search—no separate detection model needed. The system processes streaming OCSF events in near real-time to automatically identify unusual behavior.
 
 ---
 
@@ -29,9 +29,9 @@ This tutorial series takes you from ResNet fundamentals to deploying and monitor
 - Detect anomalies purely through vector DB operations (k-NN distance scoring—no classical DL detection model)
 - Monitor embedding quality and trigger automated retraining of the embedding model when drift is detected
 
-**Target Audience**: ML engineers, security engineers, and data scientists working with observability data
+**Target Audience**: ML engineers, operations engineers, and data scientists working with observability data
 
-**Applicability**: While this series uses **OCSF security logs** as the running example, the TabularResNet embedding approach applies to **any structured observability data**:
+**Applicability**: While this series uses **OCSF observability logs** as the running example, the TabularResNet embedding approach applies to **any structured observability data**:
 - **Telemetry/Metrics**: Time-series data (CPU%, memory, latency) with metadata (host, service, region) → convert to tabular rows
 - **Configuration data**: Key-value pairs, settings, deployment configs → naturally tabular
 - **Distributed traces**: Span attributes (service, duration, status_code, error) → tabular features per span
@@ -44,7 +44,7 @@ This tutorial series takes you from ResNet fundamentals to deploying and monitor
 - Understanding of neural networks (or complete our [Neural Networks From Scratch](/ai-eng/nnfs/index.md) series first)
 
 **Key Terms** (explained in detail throughout the series):
-- **Embeddings**: Dense numerical vectors that capture the essence of complex data (like converting a security log into a list of numbers)
+- **Embeddings**: Dense numerical vectors that capture the essence of complex data (like converting an observability event into a list of numbers)
 - **Self-supervised learning**: Training a model without labeled data by creating learning tasks from the data itself
 - **Vector database**: A specialized database for storing and quickly searching through embeddings based on similarity
 - **ResNet**: A deep learning architecture that uses "residual connections" to train very deep networks effectively
