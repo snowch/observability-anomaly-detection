@@ -90,10 +90,17 @@ flowchart LR
 
 Before calculating metrics, visualize the high-dimensional space to catch obvious semantic failures. Numbers don't tell the whole story—a model might have a high Silhouette Score but still confuse critical event types (e.g., treating errors the same as successful operations).
 
-**The goal**: Project high-dimensional embeddings (e.g., 256-dim) → 2D scatter plot where you can visually inspect:
-- Do similar OCSF events cluster together?
-- Are different event types clearly separated?
-- Do anomalies appear as outliers or in sparse regions?
+**The goal**: Project high-dimensional embeddings (e.g., 256-dim) → 2D scatter plot for visual inspection.
+
+```{important}
+**Three questions to ask when viewing your visualization:**
+
+1. **Do similar OCSF events cluster together?** (e.g., all logins in one region)
+2. **Are different event types clearly separated?** (e.g., success vs failure not mixed)
+3. **Do anomalies appear as outliers or in sparse regions?** (not buried in normal clusters)
+
+If the answer to any of these is "no," your embeddings need improvement before production.
+```
 
 ### Dimensionality Reduction: t-SNE vs. UMAP
 
