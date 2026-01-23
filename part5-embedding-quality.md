@@ -858,6 +858,8 @@ Use for relative comparison between models—no fixed threshold.
 How many natural groupings exist in your OCSF data? Use multiple metrics together to find the answer.
 
 ```{code-cell}
+:tags: [hide-input]
+
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
 
 def comprehensive_cluster_metrics(embeddings, n_clusters_range=range(2, 10)):
@@ -1068,6 +1070,8 @@ All previous metrics are proxies. The ultimate test is: do these embeddings actu
 | < 0.70 | Poor—embeddings don't capture class distinctions |
 
 ```{code-cell}
+:tags: [hide-input]
+
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score
 
