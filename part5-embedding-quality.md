@@ -348,6 +348,8 @@ Beyond clustering structure, the **magnitude (L2 norm)** of embeddings can revea
 Models often produce embeddings with unusual norms for inputs that differ from training data.
 
 ```{code-cell}
+:tags: [hide-input]
+
 # Dual visualization: structure + embedding norm
 fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
