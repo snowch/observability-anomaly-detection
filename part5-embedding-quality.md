@@ -202,10 +202,6 @@ ax.set_ylabel('t-SNE dim 2', fontsize=10)
 ax.legend(loc='best', fontsize=9)
 ax.grid(True, alpha=0.3)
 
-# Add annotation about the problem
-ax.text(0.5, -0.12, 'Tight clusters, but global\ndistances may be distorted',
-        transform=ax.transAxes, ha='center', fontsize=9, style='italic', color='#666')
-
 # Panel 3: High perplexity t-SNE
 ax = axes[2]
 tsne_high = TSNE(n_components=2, perplexity=50, random_state=42, max_iter=1000)
@@ -222,22 +218,37 @@ ax.set_ylabel('t-SNE dim 2', fontsize=10)
 ax.legend(loc='best', fontsize=9)
 ax.grid(True, alpha=0.3)
 
-# Add annotation about the benefit
-ax.text(0.5, -0.12, 'Better preservation of\nglobal cluster relationships',
-        transform=ax.transAxes, ha='center', fontsize=9, style='italic', color='#666')
-
 plt.tight_layout()
 plt.show()
 
-print("KEY INSIGHT:")
-print("  - Low perplexity: Focuses on local neighborhoods (tight clusters)")
-print("  - High perplexity: Considers global structure (cluster relationships)")
-print("  - For anomaly detection: Start with perplexity=30, adjust based on dataset size")
+print("="*70)
+print("READING THIS VISUALIZATION")
+print("="*70)
+print()
+print("LEFT PANEL (Original Space):")
+print("  • Shows the TRUE relationships: A is close to B, both are far from C")
+print("  • This is what we want t-SNE to preserve")
+print()
+print("MIDDLE PANEL (Low Perplexity = 5):")
+print("  • Each point only 'looks at' ~5 neighbors")
+print("  • Result: Tight, well-separated clusters (good for local structure)")
+print("  • Problem: Global distances are distorted—C may not look 'far' from A/B")
+print()
+print("RIGHT PANEL (High Perplexity = 50):")
+print("  • Each point 'looks at' ~50 neighbors (more global view)")
+print("  • Result: Better preservation of cluster relationships")
+print("  • C should appear farther from A/B, matching the original space")
+print()
+print("KEY TAKEAWAY: Start with perplexity=30, adjust based on what you need:")
+print("  • Lower (5-15): Finding tight local clusters")
+print("  • Higher (50+): Understanding global structure")
 ```
 
 **Rule of thumb**: perplexity should be smaller than your number of samples. For 1000 samples, try perplexity 5-50.
 
 ```{code-cell}
+:tags: [hide-input]
+
 import logging
 import warnings
 
