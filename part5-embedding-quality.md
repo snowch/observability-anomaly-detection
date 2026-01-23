@@ -201,6 +201,64 @@ print("  - Anomalies should be outliers or in sparse regions")
 2. Are the clusters interpretable? (Can you map them to event types?)
 3. Where are your known anomalies? (They should be outliers, not mixed into normal clusters)
 
+#### Using Embedding Norm as Anomaly Indicator
+
+Beyond clustering structure, the **magnitude (L2 norm)** of embeddings can reveal anomalies. Models often produce embeddings with unusual norms for inputs that differ from training data.
+
+```{code-cell}
+# Dual visualization: structure + embedding norm
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+# Run t-SNE once
+tsne = TSNE(n_components=2, perplexity=30, random_state=42, max_iter=1000)
+emb_2d = tsne.fit_transform(all_embeddings)
+
+# Left: Colored by class labels (known structure)
+colors = plt.cm.tab10(np.linspace(0, 1, len(np.unique(labels))))
+for i, label in enumerate(np.unique(labels)):
+    mask = labels == label
+    axes[0].scatter(emb_2d[mask, 0], emb_2d[mask, 1],
+                   c=[colors[i]], label=f"Class {label}", alpha=0.6, s=30)
+axes[0].legend(loc='best')
+axes[0].set_title('Colored by Class (Known Labels)', fontsize=14, fontweight='bold')
+axes[0].set_xlabel('t-SNE Dimension 1', fontsize=12)
+axes[0].set_ylabel('t-SNE Dimension 2', fontsize=12)
+axes[0].grid(True, alpha=0.3)
+
+# Right: Colored by embedding norm (anomaly indicator)
+norms = np.linalg.norm(all_embeddings, axis=1)
+scatter = axes[1].scatter(emb_2d[:, 0], emb_2d[:, 1], c=norms,
+                          cmap='viridis', alpha=0.6, s=30, edgecolors='none')
+axes[1].set_title('Colored by Embedding Norm (Anomaly Indicator)', fontsize=14, fontweight='bold')
+axes[1].set_xlabel('t-SNE Dimension 1', fontsize=12)
+axes[1].set_ylabel('t-SNE Dimension 2', fontsize=12)
+axes[1].grid(True, alpha=0.3)
+cbar = plt.colorbar(scatter, ax=axes[1])
+cbar.set_label('L2 Norm', fontsize=11)
+
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*60)
+print("COMPARING THE TWO VIEWS")
+print("="*60)
+print("LEFT (Class Labels):")
+print("  - Shows cluster structure and class separation")
+print("  - Useful when you have labeled data")
+print("")
+print("RIGHT (Embedding Norm):")
+print("  - Yellow/bright = high norm = potentially unusual")
+print("  - Purple/dark = low norm = typical patterns")
+print("  - Anomalies often have different norms than normal data")
+print("")
+print("WHAT TO LOOK FOR:")
+print("  ✓ Anomaly cluster (Class 3) should show different norm range")
+print("  ✓ High-norm outliers in sparse regions = strong anomaly signal")
+print("  ✗ If norms are uniform everywhere, norm isn't a useful indicator")
+```
+
+**Why embedding norm matters**: Neural networks often produce embeddings with unusual magnitudes for out-of-distribution inputs. A login event from a never-seen IP might have a much higher or lower norm than typical logins. This is a **free anomaly signal** you get alongside distance-based detection.
+
 #### UMAP: Focus on Global Structure
 
 **What is UMAP?** Uniform Manifold Approximation and Projection preserves both local and global structure better than t-SNE. Generally faster and more scalable.
