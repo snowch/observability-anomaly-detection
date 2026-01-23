@@ -186,6 +186,9 @@ print("  - Anomalies should be outliers or in sparse regions")
 - **Reproducibility**: UMAP plots are more consistent across runs
 
 ```{code-cell}
+import warnings
+warnings.filterwarnings("ignore", message="n_jobs value")
+
 import umap
 
 def visualize_embeddings_umap(embeddings, labels=None, title="Embedding Space (UMAP)", n_neighbors=15):
