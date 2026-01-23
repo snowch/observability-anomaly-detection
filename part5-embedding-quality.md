@@ -15,6 +15,20 @@ bibliography:
 
 Learn how to evaluate and validate the quality of learned embeddings before deploying to production.
 
+```{admonition} TL;DR: Key Thresholds for Production
+:class: tip
+
+| Metric | Target | What It Measures |
+|--------|--------|------------------|
+| **Silhouette Score** | > 0.5 | Cluster separation |
+| **Davies-Bouldin Index** | < 1.0 | Cluster overlap |
+| **Perturbation Stability** | > 0.92 | Robustness to noise |
+| **k-NN Accuracy** | > 0.85 | Downstream usefulness |
+| **Inference Latency** | < 50ms | Real-time capability |
+
+**Quick decision**: If Silhouette > 0.5 AND Davies-Bouldin < 1.0 AND visual inspection shows distinct clusters → ready for production.
+```
+
 ## 1. Introduction: The Quality Gap
 
 After training your TabularResNet using self-supervised learning ([Part 4](part4-self-supervised-training)), you need to verify that the embeddings are actually useful before deploying to production.
@@ -44,7 +58,31 @@ We evaluate embeddings using a two-pronged strategy that follows the data scienc
 
 **Why this matters for observability data**: Poor embeddings make anomaly detection fail silently. If your model thinks failed requests look similar to successful ones, it won't catch service degradation or configuration errors. Evaluation catches these problems early.
 
-<!-- [Image: Flowchart showing the four evaluation phases as a pipeline: Inspect → Measure → Stress Test → Operationalize, with decision gates between each phase] -->
+```{admonition} Skip Ahead Guide
+:class: hint
+
+- **Just need metrics?** Jump to [Phase 2: Cluster Quality Metrics](#phase-2-cluster-quality-metrics-the-math)
+- **Checking production readiness?** Jump to [Phase 4: Operational Metrics](#phase-4-production-readiness-operational-metrics)
+- **Want the checklist?** Jump to [Pre-Deployment Protocol](#synthesis-the-pre-deployment-protocol)
+- **First time?** Read through sequentially—each phase builds on the previous
+```
+
+```{mermaid}
+flowchart LR
+    A[📊 Phase 1<br/>Visualize] --> B{Clusters<br/>visible?}
+    B -->|Yes| C[📏 Phase 2<br/>Measure]
+    B -->|No| R1[🔄 Retrain]
+    C --> D{Silhouette<br/>> 0.5?}
+    D -->|Yes| E[🔧 Phase 3<br/>Stress Test]
+    D -->|No| R1
+    E --> F{Stable?}
+    F -->|Yes| G[⚡ Phase 4<br/>Operationtic]
+    F -->|No| R1
+    G --> H{Fast<br/>enough?}
+    H -->|Yes| I[✅ Deploy]
+    H -->|No| O[Optimize]
+    O --> G
+```
 
 ---
 
@@ -454,6 +492,8 @@ Visualization shows overall structure, but you need to zoom in and check if indi
 <!-- [Image: Diagram showing a query embedding with arrows pointing to its top-5 neighbors, with semantic labels showing whether neighbors are correctly similar] -->
 
 ```{code-cell}
+:tags: [hide-input]
+
 def inspect_nearest_neighbors(query_embedding, all_embeddings, all_records, query_record=None, k=10):
     """
     Find and display the k nearest neighbors for a query embedding.
@@ -603,6 +643,10 @@ def check_semantic_violations(query, neighbors):
 - Review your feature engineering (Part 3): Are you encoding the right fields?
 - Check augmentation strategy (Part 4): Are you accidentally destroying important distinctions?
 - Retrain with more epochs or different hyperparameters
+
+```{tip}
+**Phase 1 Summary**: Use t-SNE/UMAP to visualize structure, then spot-check nearest neighbors. If you see distinct clusters AND neighbors make semantic sense, proceed to Phase 2. If everything is one blob or neighbors are random, go back to training.
+```
 
 ---
 
@@ -853,6 +897,10 @@ print("  - Calinski-Harabasz: Higher is better (no upper bound)")
 
 **For OCSF observability data**: Start with k = number of event types you expect (typically 3-7 for operational logs).
 
+```{tip}
+**Phase 2 Summary**: Target Silhouette > 0.5 and Davies-Bouldin < 1.0. Use multiple metrics together to find optimal k. If metrics pass thresholds, proceed to stress testing. If not, revisit training or feature engineering.
+```
+
 ---
 
 ## 4. Phase 3: Robustness & Utility (The Stress Test)
@@ -878,6 +926,8 @@ Having good metrics on static data isn't enough. We need to ensure embeddings wo
 **Why instability is bad**: If a login with 1024 bytes gets embedding A, but 1030 bytes (+0.6% noise) gets completely different embedding B, your anomaly detector will give inconsistent results.
 
 ```{code-cell}
+:tags: [hide-input]
+
 def evaluate_embedding_stability(model, numerical, categorical, num_perturbations=10, noise_level=0.1):
     """
     Evaluate embedding stability under input perturbations.
@@ -1032,6 +1082,8 @@ knn_acc, knn_std = evaluate_knn_classification(all_embeddings[:600], labels_subs
 Compare different architectures and hyperparameters systematically.
 
 ```{code-cell}
+:tags: [hide-input]
+
 def compare_embedding_models(embeddings_dict, labels, metric='silhouette'):
     """
     Compare multiple embedding models.
@@ -1099,6 +1151,10 @@ comparison = compare_embedding_models(embeddings_dict, labels_subset, metric='si
 3. **Training strategy**: Compare contrastive learning vs MFP
    - Which self-supervised method works better for your OCSF data?
 
+```{tip}
+**Phase 3 Summary**: Test perturbation stability (target > 0.92) and k-NN accuracy (target > 0.85). Use model comparison to justify architecture choices. If embeddings are robust and useful, proceed to operational validation.
+```
+
 ---
 
 ## 5. Phase 4: Production Readiness (Operational Metrics)
@@ -1119,6 +1175,8 @@ Even with perfect embeddings (Silhouette = 1.0), the model is useless if it's to
 | > 100ms | Historical analysis only |
 
 ```{code-cell}
+:tags: [hide-input]
+
 import time
 
 def measure_inference_latency(model, numerical, categorical, num_trials=100):
@@ -1188,6 +1246,8 @@ print("Usage: measure_inference_latency(model, numerical_batch, categorical_batc
 **What this measures**: Storage required per embedding vector in your vector database.
 
 ```{code-cell}
+:tags: [hide-input]
+
 def analyze_memory_footprint(embedding_dim, num_events, precision='float32'):
     """
     Calculate storage requirements for embeddings.
@@ -1255,6 +1315,8 @@ footprint = analyze_memory_footprint(
 <!-- [Image: Line chart showing Silhouette Score vs Embedding Dimension (128, 256, 512) with a second y-axis showing Storage Cost, illustrating the diminishing returns] -->
 
 ```{code-cell}
+:tags: [hide-input]
+
 def compare_embedding_dimensions():
     """
     Compare quality metrics across different embedding dimensions.
@@ -1290,6 +1352,10 @@ compare_embedding_dimensions()
 2. If quality is poor (<0.5 Silhouette), try d_model=512
 3. If latency is too high (>50ms), try d_model=128
 4. Always measure—don't assume bigger is better
+
+```{tip}
+**Phase 4 Summary**: Target latency < 50ms for real-time detection. Balance embedding dimension against storage costs. d_model=256 is usually the sweet spot. If operational requirements are met, you're ready to deploy!
+```
 
 ---
 
@@ -1336,6 +1402,8 @@ Before deploying embeddings to production, verify all criteria across the four p
 The final script that ties everything together:
 
 ```{code-cell}
+:tags: [hide-input]
+
 def generate_embedding_quality_report(embeddings, labels=None, model=None, save_path='embedding_report.html'):
     """
     Generate comprehensive embedding quality report.
