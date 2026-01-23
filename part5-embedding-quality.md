@@ -29,7 +29,7 @@ Learn how to evaluate and validate the quality of learned embeddings before depl
 **Quick decision**: If Silhouette > 0.5 AND Davies-Bouldin < 1.0 AND visual inspection shows distinct clusters → ready for production.
 ```
 
-## 1. Introduction: The Quality Gap
+## Introduction: The Quality Gap
 
 After training your TabularResNet using self-supervised learning ([Part 4](part4-self-supervised-training)), you need to verify that the embeddings are actually useful before deploying to production.
 
@@ -76,7 +76,7 @@ flowchart LR
     D -->|Yes| E[🔧 Phase 3<br/>Stress Test]
     D -->|No| R1
     E --> F{Stable?}
-    F -->|Yes| G[⚡ Phase 4<br/>Operationtic]
+    F -->|Yes| G[⚡ Phase 4<br/>Operational]
     F -->|No| R1
     G --> H{Fast<br/>enough?}
     H -->|Yes| I[✅ Deploy]
@@ -86,16 +86,23 @@ flowchart LR
 
 ---
 
-## 2. Phase 1: Qualitative Inspection (The "Eye Test")
+## Phase 1: Qualitative Inspection (The "Eye Test")
 
 Before calculating metrics, visualize the high-dimensional space to catch obvious semantic failures. Numbers don't tell the whole story—a model might have a high Silhouette Score but still confuse critical event types (e.g., treating errors the same as successful operations).
 
-**The goal**: Project high-dimensional embeddings (e.g., 256-dim) → 2D scatter plot where you can visually inspect:
-- Do similar OCSF events cluster together?
-- Are different event types clearly separated?
-- Do anomalies appear as outliers or in sparse regions?
+**The goal**: Project high-dimensional embeddings (e.g., 256-dim) → 2D scatter plot for visual inspection.
 
-### 2.1 Dimensionality Reduction: t-SNE vs. UMAP
+```{important}
+**Three questions to ask when viewing your visualization:**
+
+1. **Do similar OCSF events cluster together?** (e.g., all logins in one region)
+2. **Are different event types clearly separated?** (e.g., success vs failure not mixed)
+3. **Do anomalies appear as outliers or in sparse regions?** (not buried in normal clusters)
+
+If the answer to any of these is "no," your embeddings need improvement before production.
+```
+
+### Dimensionality Reduction: t-SNE vs. UMAP
 
 Two techniques help us visualize high-dimensional embedding spaces in 2D:
 
@@ -483,7 +490,7 @@ print("  - Clusters should appear in similar positions but with different shapes
 
 ---
 
-### 2.2 Nearest Neighbor Inspection
+### Nearest Neighbor Inspection
 
 Visualization shows overall structure, but you need to zoom in and check if individual embeddings make sense. A model might create nice-looking clusters but still confuse critical event distinctions (success vs. failure, normal load vs. overload).
 
@@ -650,7 +657,7 @@ def check_semantic_violations(query, neighbors):
 
 ---
 
-## 3. Phase 2: Cluster Quality Metrics (The Math)
+## Phase 2: Cluster Quality Metrics (The Math)
 
 Now we move from subjective "looking" to objective scoring. These metrics give you numbers to track over time and compare models.
 
@@ -659,7 +666,7 @@ Now we move from subjective "looking" to objective scoring. These metrics give y
 - Tracking embedding quality during training (compute every 10 epochs)
 - Setting production deployment thresholds ("don't deploy if Silhouette < 0.5")
 
-### 3.1 Cohesion & Separation Metrics
+### Cohesion & Separation Metrics
 
 Three complementary metrics measure how well your embeddings form distinct clusters:
 
@@ -829,7 +836,7 @@ Use for relative comparison between models—no fixed threshold.
 
 ---
 
-### 3.2 Determining Optimal Clusters (k)
+### Determining Optimal Clusters (k)
 
 How many natural groupings exist in your OCSF data? Use multiple metrics together to find the answer.
 
@@ -903,11 +910,11 @@ print("  - Calinski-Harabasz: Higher is better (no upper bound)")
 
 ---
 
-## 4. Phase 3: Robustness & Utility (The Stress Test)
+## Phase 3: Robustness & Utility (The Stress Test)
 
 Having good metrics on static data isn't enough. We need to ensure embeddings work in the real world where data has noise and the goal is actual anomaly detection.
 
-### 4.1 Perturbation Stability
+### Perturbation Stability
 
 **Why robustness matters**: In production, OCSF data has noise—network jitter causes timestamp variations, rounding errors affect byte counts. Good embeddings should be stable under these small perturbations.
 
@@ -1028,7 +1035,7 @@ stability_results = simulate_stability_test(all_embeddings[:600])
 
 ---
 
-### 4.2 Proxy Tasks: k-NN Classification
+### Proxy Tasks: k-NN Classification
 
 All previous metrics are proxies. The ultimate test is: do these embeddings actually help with your end task (anomaly detection)?
 
@@ -1077,7 +1084,7 @@ knn_acc, knn_std = evaluate_knn_classification(all_embeddings[:600], labels_subs
 
 ---
 
-### 4.3 Model Benchmarking
+### Model Benchmarking
 
 Compare different architectures and hyperparameters systematically.
 
@@ -1157,13 +1164,13 @@ comparison = compare_embedding_models(embeddings_dict, labels_subset, metric='si
 
 ---
 
-## 5. Phase 4: Production Readiness (Operational Metrics)
+## Phase 4: Production Readiness (Operational Metrics)
 
 Even with perfect embeddings (Silhouette = 1.0), the model is useless if it's too slow for real-time detection or too large to deploy.
 
 **The reality**: You're embedding millions of OCSF events per day. Latency, memory, and throughput directly impact your system's viability.
 
-### 5.1 Inference Latency
+### Inference Latency
 
 **What this measures**: Time to embed a single OCSF record (milliseconds).
 
@@ -1241,7 +1248,7 @@ print("Usage: measure_inference_latency(model, numerical_batch, categorical_batc
 
 ---
 
-### 5.2 Memory Footprint & Storage Costs
+### Memory Footprint & Storage Costs
 
 **What this measures**: Storage required per embedding vector in your vector database.
 
@@ -1308,7 +1315,7 @@ footprint = analyze_memory_footprint(
 
 ---
 
-### 5.3 The Dimension Trade-off
+### The Dimension Trade-off
 
 **The question**: Does using d_model=512 actually improve quality enough to justify 2x cost?
 
@@ -1359,11 +1366,11 @@ compare_embedding_dimensions()
 
 ---
 
-## 6. Synthesis: The Pre-Deployment Protocol
+## Synthesis: The Pre-Deployment Protocol
 
 Before deploying embeddings to production, verify all criteria across the four phases.
 
-### 6.1 The "Go/No-Go" Checklist
+### The "Go/No-Go" Checklist
 
 #### Quantitative Metrics
 
@@ -1397,7 +1404,7 @@ Before deploying embeddings to production, verify all criteria across the four p
 
 ---
 
-### 6.2 Automated Quality Report
+### Automated Quality Report
 
 The final script that ties everything together:
 
@@ -1469,7 +1476,7 @@ report = generate_embedding_quality_report(all_embeddings[:600], labels_subset)
 
 ---
 
-## 7. Summary & Next Steps
+## Summary & Next Steps
 
 In this part, you learned a comprehensive four-phase approach to evaluating embedding quality before production deployment:
 
