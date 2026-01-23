@@ -246,6 +246,8 @@ print("  • Higher (50+): Understanding global structure")
 
 **Rule of thumb**: perplexity should be smaller than your number of samples. For 1000 samples, try perplexity 5-50.
 
+**Example implementation**: The following code shows how to create a t-SNE visualization function and apply it to simulated OCSF embeddings with different event types and anomalies.
+
 ```{code-cell}
 :tags: [hide-input]
 
