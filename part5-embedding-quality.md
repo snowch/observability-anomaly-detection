@@ -418,6 +418,8 @@ print("  ✗ If norms are uniform everywhere, norm isn't a useful indicator")
 - **Reproducibility**: UMAP plots are more consistent across runs
 
 ```{code-cell}
+:tags: [hide-input]
+
 import warnings
 warnings.filterwarnings("ignore", message="n_jobs value")
 
