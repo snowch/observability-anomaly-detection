@@ -82,6 +82,36 @@ Two techniques help us visualize high-dimensional embedding spaces in 2D:
 - **perplexity=30**: Balanced view (default, good starting point)
 - **perplexity=50**: Emphasizes global structure (good for large datasets >10K samples)
 
+**Visual intuition for perplexity**:
+
+```
+Original high-dimensional space (3 clusters: A, B, C where A is close to B, far from C)
+
+    A-cluster    B-cluster                    C-cluster
+    ┌───────┐    ┌───────┐                    ┌───────┐
+    │ • • • │    │ x x x │                    │ o o o │
+    │ • • • │    │ x x x │                    │ o o o │
+    └───────┘    └───────┘                    └───────┘
+         └──close──┘                               │
+              └────────────── far ─────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│  LOW PERPLEXITY (5)               HIGH PERPLEXITY (50)           │
+│  "Who are my immediate            "How does my cluster relate    │
+│   neighbors?"                      to ALL other clusters?"       │
+│                                                                  │
+│       o o                          • •      x x            o o   │
+│    • •    x x                       • •      x x            o o  │
+│   • •      x x   o o                                             │
+│                                    A close   B close      C far  │
+│   Tight clusters, but             Clusters spread out but        │
+│   C appears close to A/B          preserve global distances:     │
+│   (WRONG global structure)        A-B close, C far (CORRECT)     │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Rule of thumb**: perplexity should be smaller than your number of samples. For 1000 samples, try perplexity 5-50.
+
 ```{code-cell}
 import logging
 import warnings
