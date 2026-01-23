@@ -285,7 +285,9 @@ print("  - Anomalies should be outliers or in sparse regions")
 
 Beyond clustering structure, the **magnitude (L2 norm)** of embeddings can reveal anomalies.
 
+```{note}
 **What is embedding norm?** The L2 norm (also called Euclidean norm) is simply the "length" of the embedding vector—calculated as the square root of the sum of squared components: $\|v\| = \sqrt{v_1^2 + v_2^2 + ... + v_n^2}$. For a 256-dimensional embedding, this gives a single number representing how "far" the vector is from the origin.
+```
 
 Models often produce embeddings with unusual norms for inputs that differ from training data.
 
