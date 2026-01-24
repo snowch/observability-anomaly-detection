@@ -868,6 +868,8 @@ Three complementary metrics measure how well your embeddings form distinct clust
 ```{code-cell}
 :tags: [hide-input]
 
+np.random.seed(42)
+
 # Visualize the Silhouette Score concept
 fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -905,7 +907,7 @@ ax.plot([query_point[0], nearest_b_point[0]],
 mid_a = (query_point + cluster_a_points[1]) / 2
 ax.annotate('', xy=cluster_a_points[1], xytext=query_point,
             arrowprops=dict(arrowstyle='<->', color='#3498db', lw=2))
-ax.text(mid_a[0], mid_a[1] - 0.5, 'a = avg distance\nto own cluster',
+ax.text(mid_a[0] - 1.2, mid_a[1] - 1.2, 'a = avg distance\nto own cluster',
         ha='center', fontsize=10, color='#3498db', fontweight='bold',
         bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='#3498db', alpha=0.9))
 
@@ -932,7 +934,7 @@ ax.set_xlabel('Embedding Dimension 1', fontsize=11)
 ax.set_ylabel('Embedding Dimension 2', fontsize=11)
 ax.set_title('Silhouette Score Intuition: Measuring Cluster Quality for One Point',
              fontsize=13, fontweight='bold', pad=15)
-ax.legend(loc='upper left', fontsize=10)
+ax.legend(loc='upper left', fontsize=10, labelspacing=1)
 ax.grid(True, alpha=0.2)
 
 plt.tight_layout()
