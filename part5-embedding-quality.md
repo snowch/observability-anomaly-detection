@@ -853,6 +853,7 @@ Now we move from subjective "looking" to objective scoring. These metrics give y
 - Comparing multiple model configurations (ResNet-256 vs ResNet-512)
 - Tracking embedding quality during training (compute every 10 epochs)
 - Setting production deployment thresholds ("don't deploy if Silhouette < 0.5")
+- Monitoring production embeddings for degradation (see [Part 8: Production Monitoring](part8-production-monitoring) for ongoing monitoring and retraining triggers)
 
 ### Cohesion & Separation Metrics
 
@@ -1702,6 +1703,14 @@ In this part, you learned a comprehensive four-phase approach to evaluating embe
 - **Observability-specific concerns**: Check that critical operational distinctions (success/failure, severity levels) are preserved
 - **Production readiness**: Balance quality, latency, and cost before deploying
 - **Iterative process**: If embeddings fail evaluation, go back to Parts 3-4 (feature engineering, training)
+
+```{note}
+**Ongoing Monitoring**: The evaluation techniques in this part are for pre-deployment validation. Once in production, you'll need continuous monitoring to detect when embeddings degrade and need retraining. See [Part 8: Production Monitoring](part8-production-monitoring) for:
+- Detecting data drift and embedding staleness
+- Setting up automated alerts for quality degradation
+- Determining when to retrain your embedding model
+- Using these same metrics (Silhouette, k-NN accuracy) as retraining triggers
+```
 
 **Next**: In [Part 6](part6-anomaly-detection), we'll use these validated embeddings to detect anomalies using various algorithms (LOF, Isolation Forest, distance-based methods).
 
