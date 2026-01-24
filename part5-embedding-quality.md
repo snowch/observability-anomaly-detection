@@ -957,7 +957,37 @@ print()
 print("IDEAL: Small 'a' (tight cluster) + Large 'b' (far from others) → High score!")
 ```
 
-**Memory aid**: "**S**ilhouette = **S**eparation minus cohesion". High score means your point is **far from other clusters** (high b) and **close to its own cluster** (low a).
+**Memory aid**: "**S**ilhouette = **S**eparation minus cohesion-distance". High score means your point is **far from other clusters** (high b) and **close to its own cluster** (low a).
+
+```{note}
+**Two types of silhouette scores**:
+- **Per-sample silhouette score**: Computed for each individual point using the formula below. This tells you how well-placed that specific sample is.
+- **Average silhouette score**: The mean of all per-sample scores across your dataset. This is the single number reported as "the Silhouette Score" and used for model comparison.
+
+The silhouette plot (shown later) displays all per-sample scores, while the red dashed line shows the average.
+```
+
+**How it works**: For each point, compute:
+1. `a` = average distance to other points in same cluster (intra-cluster distance)
+   - Low `a` = tight, cohesive cluster (good!)
+2. `b` = average distance to points in nearest different cluster (inter-cluster distance)
+   - High `b` = well-separated from other clusters (good!)
+3. Silhouette = `(b - a) / max(a, b)`
+   - The numerator `(b - a)` measures how much better your cluster is than the nearest alternative
+   - The denominator `max(a, b)` normalizes to the range [-1, +1], making scores comparable across different scales
+
+```{admonition} Why divide by max(a, b)?
+:class: dropdown
+
+Without normalization, silhouette scores would depend on the absolute scale of your embedding space. Two clusters separated by distance 10 would get a different raw score than two clusters with identical relative structure but separated by distance 100.
+
+By dividing by max(a, b), we get a scale-free metric:
+- If b >> a (well-separated): Silhouette approaches +1, regardless of whether b=10 or b=1000
+- If a >> b (misplaced): Silhouette approaches -1
+- If a ≈ b (on boundary): Silhouette approaches 0
+
+This makes the metric useful for comparing different embedding models, even if they produce embeddings with different magnitudes.
+```
 
 **Range**: -1 to +1
 
@@ -968,11 +998,6 @@ print("IDEAL: Small 'a' (tight cluster) + Large 'b' (far from others) → High s
 | +0.25 to +0.5 | Weak structure—clusters exist but with significant overlap | Consider retraining |
 | 0 to +0.25 | Barely any structure | Retrain with different approach |
 | Negative | Point is likely in wrong cluster | Clustering failed |
-
-**How it works**: For each point, compute:
-1. `a` = average distance to other points in same cluster (intra-cluster distance)
-2. `b` = average distance to points in nearest different cluster (inter-cluster distance)
-3. Silhouette = `(b - a) / max(a, b)`
 
 **For OCSF observability data**: Target Silhouette > 0.5 for production deployment.
 
@@ -1058,19 +1083,81 @@ plt.tight_layout()
 plt.show()
 ```
 
+#### Understanding the Silhouette Plot
+
+**What are you looking at?**
+
+The silhouette plot visualizes the quality of your clustering by showing the silhouette coefficient for every single sample in your dataset.
+
+**Anatomy of the plot**:
+
+- **X-axis**: Silhouette coefficient value (-1 to +1)
+  - Values near +1: Sample is far from neighboring clusters (well-placed)
+  - Values near 0: Sample is on or very close to the decision boundary between clusters
+  - Negative values: Sample is likely assigned to the wrong cluster
+
+- **Y-axis**: Individual samples, stacked vertically
+  - Each horizontal bar represents one sample
+  - Samples are grouped by their cluster assignment and sorted by silhouette score within each cluster
+  - The y-axis label shows which cluster each group belongs to
+  - **Important**: The y-axis is not a feature or metric—it's just a stacking mechanism to show all samples
+
+- **Colors**: Each cluster gets a different color (e.g., blue for Cluster 0, orange for Cluster 1)
+
+- **Red dashed line**: The average silhouette score across all samples
+
 **Reading the silhouette plot**:
 
 1. **Red dashed line** (average): Your overall Silhouette Score
    - **Why > 0.5 for production?** Remember that silhouette ranges from -1 to +1. A score of 0.5 means each sample is, on average, twice as close to its own cluster as to the nearest other cluster. Below 0.5, clusters start to blur together—your model may confuse similar event types. In observability, misclassifying a service degradation event as normal operation means missing an outage before it escalates.
 
-2. **Width of each colored band**: Per-sample scores within that cluster
-   - **What is "wide"?** If the horizontal bars for a cluster span more than 0.3 units (e.g., some samples at 0.2 and others at 0.8), you have inconsistent embeddings. A tight cluster would have all samples within ~0.1 of each other. Wide spread often means your cluster contains semantically different events that were grouped together.
+2. **Height of each colored band**: Number of samples in that cluster
+   - Taller bands = more samples in that cluster
+   - Uneven heights might be fine (e.g., rare errors vs. common operations) or indicate problems (model collapse)
 
-3. **Points below zero**: These samples are closer to a *different* cluster than their assigned one
-   - **Why is this bad?** A negative silhouette (b < a) literally means the sample's average distance to the nearest other cluster (b) is smaller than its average distance to its own cluster (a). The math says: "this point is in the wrong place." These are either mislabeled, edge cases, or indicate your embedding model treats them differently than expected.
+3. **Width/shape of each colored band**: Distribution of silhouette scores within that cluster
+   - **Knife shape** (narrow, vertical): All samples have similar silhouette scores → highly consistent cluster → **GOOD**
+   - **Bulge or wide spread**: Samples have varying scores (e.g., 0.2 to 0.8) → inconsistent cluster → **WARNING**
+     - If horizontal span > 0.3 units, investigate: your cluster may contain semantically different event types grouped together
+   - **Irregular or notched**: Some samples well-placed, others not → potential sub-clusters or mixed semantics
 
-4. **Uneven cluster sizes**: If one cluster has 500 samples and another has 50, investigate
-   - This might be fine (rare error types vs. common operational events), or it might indicate model collapse where diverse events get lumped together. Cross-reference with your actual OCSF event type distribution.
+4. **Points extending left of zero**: Samples with negative silhouette scores
+   - **Why is this bad?** A negative silhouette (b < a) literally means the sample's average distance to the nearest other cluster (b) is smaller than its average distance to its own cluster (a). The math says: "this point is in the wrong place."
+   - These are either mislabeled, edge cases, or indicate your embedding model treats them differently than expected
+   - **Action**: If >5% of samples are negative, your clustering needs improvement
+
+5. **Comparison across clusters**: Do all clusters extend past the red line?
+   - ✅ **Good**: All clusters have most samples to the right of the average line (all clusters are well-formed)
+   - ⚠ **Warning**: One cluster mostly to the left of the line → that cluster has poor internal cohesion
+   - This helps identify which specific clusters need attention
+
+**Common patterns and what they mean**:
+
+| Pattern | Visual | Interpretation | Action |
+|---------|--------|----------------|--------|
+| **All knife shapes, all past red line** | Narrow vertical bands, mostly right of average | Excellent clustering—all clusters tight and well-separated | ✓ Ready for production |
+| **Wide bulges** | Bands span 0.3+ units horizontally | Inconsistent clusters—mixed semantics | Investigate cluster contents, consider more clusters |
+| **Negative values present** | Bands extend left of x=0 | Misassigned samples | Check feature engineering, try different k |
+| **One tiny cluster** | Very short band compared to others | Possible outlier cluster or rare event type | Verify: is this a real pattern or noise? |
+| **All scores near zero** | All bands centered around x=0 | Poor separation—clusters heavily overlap | Retrain model or reconsider clustering approach |
+
+```{tip}
+**Quick visual check**: A "good" silhouette plot looks like a series of knife blades all pointing right past the red dashed line, with no blades crossing the zero line. Each blade should be roughly uniform in width and not too spread out horizontally.
+```
+
+```{seealso}
+**Learn more about silhouette analysis**:
+- Original paper: Rousseeuw, P. J. (1987). "Silhouettes: a graphical aid to the interpretation and validation of cluster analysis". *Journal of Computational and Applied Mathematics*, 20, 53-65.
+- Scikit-learn documentation: [Selecting the number of clusters with silhouette analysis](https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_silhouette_analysis.html)
+- Interactive tutorial: [Visualizing K-Means with Silhouette Analysis](https://scikit-learn.org/stable/modules/clustering.html#silhouette-coefficient)
+```
+
+**For OCSF observability data—interpreting your results**:
+
+When you run this on your embeddings:
+- Each cluster should correspond to a distinct event type (e.g., successful logins, failed logins, file access, network connections)
+- If you see wide bulges or negative scores, drill down: use nearest neighbor inspection (covered earlier) to see which specific events are being confused
+- Cross-reference cluster sizes with your expected OCSF event type distribution—if one cluster is 95% of your data, something is wrong
 
 #### Davies-Bouldin Index
 
