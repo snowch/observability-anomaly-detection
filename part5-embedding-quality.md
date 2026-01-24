@@ -657,6 +657,177 @@ def check_semantic_violations(query, neighbors):
 - Known anomalies (do their neighbors look anomalous?)
 - Boundary cases (records near cluster edges)
 
+```{code-cell}
+:tags: [hide-input]
+
+def strategic_sampling(embeddings, cluster_labels, records, per_sample_silhouette=None):
+    """
+    Select representative samples for neighbor inspection using strategic sampling.
+
+    Args:
+        embeddings: Embedding vectors (num_samples, embedding_dim)
+        cluster_labels: Cluster assignments from KMeans
+        records: Original OCSF records
+        per_sample_silhouette: Per-sample silhouette scores (optional)
+
+    Returns:
+        Dictionary of strategic samples
+    """
+    samples = {
+        'cluster_representatives': [],
+        'boundary_cases': [],
+        'cluster_centers': []
+    }
+
+    unique_clusters = np.unique(cluster_labels)
+
+    for cluster_id in unique_clusters:
+        # Get all samples in this cluster
+        cluster_mask = cluster_labels == cluster_id
+        cluster_embeddings = embeddings[cluster_mask]
+        cluster_indices = np.where(cluster_mask)[0]
+
+        # 1. Representative sample: closest to cluster centroid
+        centroid = cluster_embeddings.mean(axis=0)
+        distances_to_centroid = np.linalg.norm(cluster_embeddings - centroid, axis=1)
+        representative_idx = cluster_indices[np.argmin(distances_to_centroid)]
+
+        samples['cluster_representatives'].append({
+            'cluster_id': cluster_id,
+            'sample_idx': representative_idx,
+            'record': records[representative_idx],
+            'reason': f'Closest to cluster {cluster_id} centroid (typical example)'
+        })
+
+        # 2. Boundary case: sample with lowest silhouette score in cluster
+        if per_sample_silhouette is not None:
+            cluster_silhouettes = per_sample_silhouette[cluster_mask]
+            boundary_idx = cluster_indices[np.argmin(cluster_silhouettes)]
+
+            samples['boundary_cases'].append({
+                'cluster_id': cluster_id,
+                'sample_idx': boundary_idx,
+                'record': records[boundary_idx],
+                'silhouette': per_sample_silhouette[boundary_idx],
+                'reason': f'Lowest silhouette in cluster {cluster_id} (near boundary, may be ambiguous)'
+            })
+
+    print("="*70)
+    print("STRATEGIC SAMPLING FOR NEIGHBOR INSPECTION")
+    print("="*70)
+
+    print("\n1. CLUSTER REPRESENTATIVES (typical examples):")
+    print("-"*70)
+    for sample in samples['cluster_representatives']:
+        print(f"\n  Cluster {sample['cluster_id']} representative:")
+        print(f"    Index: {sample['sample_idx']}")
+        print(f"    Record: {sample['record']}")
+        print(f"    → Use this to verify: 'Do typical samples have semantically similar neighbors?'")
+
+    if samples['boundary_cases']:
+        print("\n2. BOUNDARY CASES (edge cases, potentially ambiguous):")
+        print("-"*70)
+        for sample in samples['boundary_cases']:
+            print(f"\n  Cluster {sample['cluster_id']} boundary case:")
+            print(f"    Index: {sample['sample_idx']}")
+            print(f"    Silhouette: {sample['silhouette']:.3f}")
+            print(f"    Record: {sample['record']}")
+            print(f"    → Use this to verify: 'Are low-silhouette samples genuinely ambiguous or mislabeled?'")
+
+    return samples
+
+def test_anomaly_neighbors(embeddings, anomaly_indices, all_records, k=5):
+    """
+    Test if known anomalies have anomalous neighbors.
+
+    Args:
+        embeddings: All embeddings
+        anomaly_indices: Indices of known anomalies
+        all_records: All OCSF records
+        k: Number of neighbors to check
+
+    Returns:
+        Analysis of anomaly neighborhood quality
+    """
+    print("\n3. KNOWN ANOMALIES (do their neighbors look anomalous?):")
+    print("-"*70)
+
+    results = []
+
+    for anomaly_idx in anomaly_indices[:3]:  # Check first 3 anomalies
+        # Find k nearest neighbors
+        query_emb = embeddings[anomaly_idx]
+        all_norms = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+        query_norm = query_emb / np.linalg.norm(query_emb)
+        similarities = np.dot(all_norms, query_norm)
+
+        # Get top k neighbors (excluding the anomaly itself)
+        top_k_indices = np.argsort(similarities)[::-1][1:k+1]
+
+        # Check if neighbors are also in anomaly set
+        neighbors_are_anomalies = [idx in anomaly_indices for idx in top_k_indices]
+        anomaly_neighbor_count = sum(neighbors_are_anomalies)
+
+        print(f"\n  Anomaly at index {anomaly_idx}:")
+        print(f"    Record: {all_records[anomaly_idx]}")
+        print(f"    Neighbors that are also anomalies: {anomaly_neighbor_count}/{k}")
+
+        for rank, (neighbor_idx, is_anomaly) in enumerate(zip(top_k_indices, neighbors_are_anomalies), 1):
+            marker = "🔴 ANOMALY" if is_anomaly else "🟢 NORMAL"
+            sim = similarities[neighbor_idx]
+            print(f"      Rank {rank}: {marker} (similarity: {sim:.3f})")
+            print(f"              Record: {all_records[neighbor_idx]}")
+
+        results.append({
+            'anomaly_idx': anomaly_idx,
+            'anomaly_neighbor_ratio': anomaly_neighbor_count / k
+        })
+
+        # Interpretation
+        if anomaly_neighbor_count >= k * 0.8:
+            print(f"    ✓ GOOD: Anomaly has mostly anomalous neighbors (forms anomaly cluster)")
+        elif anomaly_neighbor_count == 0:
+            print(f"    ⚠ MIXED: Anomaly surrounded by normal events (isolated outlier)")
+        else:
+            print(f"    ○ OK: Anomaly has mix of anomalous/normal neighbors")
+
+    return results
+
+# Example: Run strategic sampling on our simulated data
+from sklearn.metrics import silhouette_samples
+from sklearn.cluster import KMeans
+
+# Cluster the embeddings
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+cluster_labels = kmeans.fit_predict(all_embeddings[:600])
+per_sample_sil = silhouette_samples(all_embeddings[:600], cluster_labels)
+
+# Strategic sampling
+strategic_samples = strategic_sampling(
+    all_embeddings[:600],
+    cluster_labels,
+    simulated_records[:6] * 100,  # Repeat records for demonstration
+    per_sample_silhouette=per_sample_sil
+)
+
+# Test anomaly neighbors
+anomaly_indices = list(range(600, 660))  # Indices 600-659 are anomalies in our simulated data
+test_anomaly_neighbors(
+    all_embeddings,
+    anomaly_indices,
+    simulated_records[:6] * 110,  # Extended records
+    k=5
+)
+
+print("\n" + "="*70)
+print("SUMMARY: STRATEGIC SAMPLING WORKFLOW")
+print("="*70)
+print("1. Test cluster representatives → verify typical cases work")
+print("2. Test boundary cases → catch edge cases and ambiguous samples")
+print("3. Test known anomalies → ensure anomalies aren't mixed with normal data")
+print("\nThis systematic approach catches problems random sampling would miss!")
+```
+
 #### Common Failures Caught by Neighbor Inspection
 
 - Model treats all failed login attempts as identical (ignores failed password vs account locked)
@@ -682,6 +853,7 @@ Now we move from subjective "looking" to objective scoring. These metrics give y
 - Comparing multiple model configurations (ResNet-256 vs ResNet-512)
 - Tracking embedding quality during training (compute every 10 epochs)
 - Setting production deployment thresholds ("don't deploy if Silhouette < 0.5")
+- Monitoring production embeddings for degradation (see [Part 8: Production Monitoring](part8-production-monitoring) for ongoing monitoring and retraining triggers)
 
 ### Cohesion & Separation Metrics
 
@@ -1531,6 +1703,14 @@ In this part, you learned a comprehensive four-phase approach to evaluating embe
 - **Observability-specific concerns**: Check that critical operational distinctions (success/failure, severity levels) are preserved
 - **Production readiness**: Balance quality, latency, and cost before deploying
 - **Iterative process**: If embeddings fail evaluation, go back to Parts 3-4 (feature engineering, training)
+
+```{note}
+**Ongoing Monitoring**: The evaluation techniques in this part are for pre-deployment validation. Once in production, you'll need continuous monitoring to detect when embeddings degrade and need retraining. See [Part 8: Production Monitoring](part8-production-monitoring) for:
+- Detecting data drift and embedding staleness
+- Setting up automated alerts for quality degradation
+- Determining when to retrain your embedding model
+- Using these same metrics (Silhouette, k-NN accuracy) as retraining triggers
+```
 
 **Next**: In [Part 6](part6-anomaly-detection), we'll use these validated embeddings to detect anomalies using various algorithms (LOF, Isolation Forest, distance-based methods).
 
