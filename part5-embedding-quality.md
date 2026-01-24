@@ -962,7 +962,9 @@ print("IDEAL: Small 'a' (tight cluster) + Large 'b' (far from others) → High s
 ```{note}
 **Two types of silhouette scores**:
 - **Per-sample silhouette score**: Computed for each individual point using the formula below. This tells you how well-placed that specific sample is.
-- **Average silhouette score**: The mean of all per-sample scores across your dataset. This is the single number reported as "the Silhouette Score" and used for model comparison.
+  - **Use case**: Identifying problematic samples, visualizing cluster quality distribution, finding boundary cases that need investigation
+- **Average silhouette score**: The mean of all per-sample scores across your dataset. This is the single number reported as "the Silhouette Score".
+  - **Use case**: Model comparison, tracking quality over training, setting production deployment thresholds
 
 The silhouette plot (shown later) displays all per-sample scores, while the red dashed line shows the average.
 ```
