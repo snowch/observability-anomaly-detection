@@ -976,6 +976,11 @@ print("IDEAL: Small 'a' (tight cluster) + Large 'b' (far from others) → High s
 
 **For OCSF observability data**: Target Silhouette > 0.5 for production deployment.
 
+**Example implementation**: The following code demonstrates how to compute silhouette scores and visualize them using a silhouette plot. This visualization helps you assess cluster quality by showing:
+1. How well each cluster is separated (width of colored bands)
+2. Whether individual samples are well-placed (positive values) or misassigned (negative values)
+3. How your overall score compares to the per-cluster distribution (red dashed line)
+
 ```{code-cell}
 :tags: [hide-input]
 
