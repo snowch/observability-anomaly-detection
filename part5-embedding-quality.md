@@ -865,28 +865,94 @@ Three complementary metrics measure how well your embeddings form distinct clust
 
 **Visual intuition**:
 
-```
-        Cluster A                    Cluster B
-      ┌─────────────┐              ┌─────────────┐
-      │   o   o     │              │     x   x   │
-      │  o  ●  o    │ ──── b ────► │   x   x     │
-      │   o   o     │              │     x   x   │
-      └─────────────┘              └─────────────┘
-           │
-           │ a = avg distance to
-           │     points in same cluster
-           ▼
-        (small a = tight cluster = GOOD)
+```{code-cell}
+:tags: [hide-input]
 
-    ● = the point we're measuring
-    o = other points in same cluster (used to compute 'a')
-    x = points in nearest other cluster (used to compute 'b')
+# Visualize the Silhouette Score concept
+fig, ax = plt.subplots(figsize=(12, 6))
 
-    Silhouette = (b - a) / max(a, b)
+# Cluster A (left cluster)
+cluster_a_center = np.array([2, 3])
+cluster_a_points = np.random.randn(8, 2) * 0.4 + cluster_a_center
+ax.scatter(cluster_a_points[:, 0], cluster_a_points[:, 1], c='#3498db', s=100,
+           alpha=0.6, edgecolors='#2c3e50', linewidth=1.5, label='Cluster A')
 
-    If b >> a: point is well-placed → score near +1 (GOOD)
-    If a >> b: point is misplaced  → score near -1 (BAD)
-    If a ≈ b:  point is on boundary → score near 0
+# Cluster B (right cluster)
+cluster_b_center = np.array([8, 3])
+cluster_b_points = np.random.randn(8, 2) * 0.4 + cluster_b_center
+ax.scatter(cluster_b_points[:, 0], cluster_b_points[:, 1], c='#e74c3c', s=100,
+           alpha=0.6, edgecolors='#2c3e50', linewidth=1.5, marker='s', label='Cluster B')
+
+# The point we're measuring (highlighted in Cluster A)
+query_point = cluster_a_points[0]
+ax.scatter(query_point[0], query_point[1], c='#f39c12', s=300,
+           edgecolors='#2c3e50', linewidth=2, marker='*', label='Point being measured', zorder=10)
+
+# Draw 'a' distances (to points in same cluster)
+for i in range(1, 4):  # Show a few intra-cluster distances
+    ax.plot([query_point[0], cluster_a_points[i, 0]],
+            [query_point[1], cluster_a_points[i, 1]],
+            'b--', alpha=0.4, linewidth=1)
+
+# Draw 'b' distance (to nearest other cluster - show distance to cluster B center)
+nearest_b_point = cluster_b_points[0]
+ax.plot([query_point[0], nearest_b_point[0]],
+        [query_point[1], nearest_b_point[1]],
+        'r-', alpha=0.7, linewidth=2.5)
+
+# Annotations
+# 'a' annotation (intra-cluster distance)
+mid_a = (query_point + cluster_a_points[1]) / 2
+ax.annotate('', xy=cluster_a_points[1], xytext=query_point,
+            arrowprops=dict(arrowstyle='<->', color='#3498db', lw=2))
+ax.text(mid_a[0], mid_a[1] - 0.5, 'a = avg distance\nto own cluster',
+        ha='center', fontsize=10, color='#3498db', fontweight='bold',
+        bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='#3498db', alpha=0.9))
+
+# 'b' annotation (inter-cluster distance)
+mid_b = (query_point + nearest_b_point) / 2
+ax.text(mid_b[0], mid_b[1] + 0.7, 'b = avg distance\nto nearest other cluster',
+        ha='center', fontsize=10, color='#e74c3c', fontweight='bold',
+        bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor='#e74c3c', alpha=0.9))
+
+# Formula box
+formula_text = (
+    "Silhouette = (b - a) / max(a, b)\n\n"
+    "• If b >> a: well-placed → score ≈ +1 ✓\n"
+    "• If a >> b: misplaced → score ≈ -1 ✗\n"
+    "• If a ≈ b: on boundary → score ≈ 0"
+)
+ax.text(5, 0.5, formula_text,
+        ha='center', fontsize=10,
+        bbox=dict(boxstyle='round,pad=0.8', facecolor='#ecf0f1', edgecolor='#34495e', linewidth=2))
+
+ax.set_xlim(-1, 11)
+ax.set_ylim(-0.5, 5.5)
+ax.set_xlabel('Embedding Dimension 1', fontsize=11)
+ax.set_ylabel('Embedding Dimension 2', fontsize=11)
+ax.set_title('Silhouette Score Intuition: Measuring Cluster Quality for One Point',
+             fontsize=13, fontweight='bold', pad=15)
+ax.legend(loc='upper left', fontsize=10)
+ax.grid(True, alpha=0.2)
+
+plt.tight_layout()
+plt.show()
+
+print("="*70)
+print("READING THIS VISUALIZATION")
+print("="*70)
+print("• STAR (⭐): The point we're scoring")
+print("• BLUE CIRCLES: Other points in the same cluster (Cluster A)")
+print("• RED SQUARES: Points in the nearest different cluster (Cluster B)")
+print("• BLUE DASHED LINES: Show 'a' distances (intra-cluster)")
+print("• RED SOLID LINE: Shows 'b' distance (inter-cluster)")
+print()
+print("SILHOUETTE CALCULATION:")
+print("  a = average of blue dashed lines (small a = tight cluster)")
+print("  b = average distance to red cluster (large b = well-separated)")
+print("  Silhouette = (b - a) / max(a, b)")
+print()
+print("IDEAL: Small 'a' (tight cluster) + Large 'b' (far from others) → High score!")
 ```
 
 **Memory aid**: "**S**ilhouette = **S**eparation minus cohesion". High score means your point is **far from other clusters** (high b) and **close to its own cluster** (low a).
