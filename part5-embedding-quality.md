@@ -505,13 +505,15 @@ print("  - Clusters should appear in similar positions but with different shapes
 3. **Outliers**: Scattered points far from clusters are potential anomalies—export and inspect them.
 4. **Cluster density**: Tight clusters = consistent embeddings (good). Diffuse = high variance (needs more training).
 
-**Practical tip—Inspect actual cluster contents**: After clustering, print a few representative samples from each cluster to understand what they represent:
-- **What to show**: Display key OCSF fields (activity_id, status, user patterns, bytes transferred, etc.) for 3-5 samples per cluster
-- **Why this helps**: You can see if Cluster 0 is "successful logins", Cluster 1 is "failed logins", Cluster 2 is "file access", etc.
-- **What to look for**: Do clusters map to meaningful event types? Or are they arbitrary splits?
+**Practical tip—Inspect actual cluster contents BEFORE looking at metrics**: After clustering, print the raw OCSF event data for representative samples from each cluster:
+- **What to show**: Display key OCSF fields (`activity_id`, `status`, `actor_user_name`, `http_request_method`, `src_endpoint_ip`, etc.) for 3-5 samples per cluster
+- **Why this helps**: You can immediately see if Cluster 0 is "successful logins", Cluster 1 is "failed logins", Cluster 2 is "file access", etc.
+- **What to look for**: Do clusters map to meaningful event types? Or are they arbitrary splits? Can you explain why these events are grouped together?
 - **Action if confused**: If you can't explain why samples are in the same cluster, your feature engineering may need work
 
-See the appendix notebook for a complete implementation that displays cluster samples and their features side-by-side.
+**Why before metrics?** Seeing "Silhouette Score = 0.6" is meaningless without context. If you've already seen that Cluster 0 contains all successful logins and Cluster 1 contains failed logins, then a score of 0.6 tells you "the model learned to separate success/failure with good quality."
+
+See the appendix notebook for a complete implementation that loads the original OCSF parquet data and displays actual event fields for cluster samples.
 
 ---
 
