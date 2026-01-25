@@ -505,6 +505,14 @@ print("  - Clusters should appear in similar positions but with different shapes
 3. **Outliers**: Scattered points far from clusters are potential anomalies—export and inspect them.
 4. **Cluster density**: Tight clusters = consistent embeddings (good). Diffuse = high variance (needs more training).
 
+**Practical tip—Inspect actual cluster contents**: After clustering, print a few representative samples from each cluster to understand what they represent:
+- **What to show**: Display key OCSF fields (activity_id, status, user patterns, bytes transferred, etc.) for 3-5 samples per cluster
+- **Why this helps**: You can see if Cluster 0 is "successful logins", Cluster 1 is "failed logins", Cluster 2 is "file access", etc.
+- **What to look for**: Do clusters map to meaningful event types? Or are they arbitrary splits?
+- **Action if confused**: If you can't explain why samples are in the same cluster, your feature engineering may need work
+
+See the appendix notebook for a complete implementation that displays cluster samples and their features side-by-side.
+
 ---
 
 ### Nearest Neighbor Inspection
@@ -1260,7 +1268,7 @@ print("  - Calinski-Harabasz: Higher is better (no upper bound)")
 **For OCSF observability data**: Start with k = number of event types you expect (typically 3-7 for operational logs).
 
 ```{tip}
-**Phase 2 Summary**: Target Silhouette > 0.5 and Davies-Bouldin < 1.0. Use multiple metrics together to find optimal k. If metrics pass thresholds, proceed to stress testing. If not, revisit training or feature engineering.
+**Phase 2 Summary**: Target Silhouette > 0.5 and Davies-Bouldin < 1.0. Use multiple metrics together to find optimal k. **Don't stop at metrics alone**—inspect actual samples from each cluster to verify they make semantic sense (see appendix notebook for implementation). If metrics pass thresholds and clusters are interpretable, proceed to stress testing. If not, revisit training or feature engineering.
 ```
 
 ---

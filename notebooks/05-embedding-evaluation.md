@@ -298,7 +298,9 @@ print("✗ If failed logins are neighbors of successful ones, model needs retrai
 
 ---
 
-## 5. Quantitative Evaluation: Cluster Quality Metrics
+## 5. Understanding Your Clusters First
+
+Before diving into metrics, let's cluster the data and see what we have:
 
 Visualization is subjective - we need objective numbers to:
 - Compare different models
@@ -309,14 +311,6 @@ Visualization is subjective - we need objective numbers to:
 
 **What it measures**: How well-separated clusters are (range: -1 to +1, higher is better)
 
-**Interpretation**:
-- **0.7-1.0**: Excellent separation
-- **0.5-0.7**: Reasonable structure (acceptable for production)
-- **0.25-0.5**: Weak structure
-- **< 0.25**: Poor clustering
-
-**Target for production**: > 0.5
-
 ```{code-cell}
 # Run k-means clustering to identify natural clusters
 n_clusters = 3  # Try 3-5 clusters for most OCSF data
@@ -325,6 +319,216 @@ print(f"Running k-means with {n_clusters} clusters...")
 kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
 cluster_labels = kmeans.fit_predict(embeddings)
 
+print(f"✓ Clustering complete!")
+print(f"Cluster sizes: {np.bincount(cluster_labels)}")
+print(f"\nBefore looking at metrics, let's understand what these clusters contain...")
+```
+
+---
+
+## 6. Inspecting Cluster Contents
+
+**Why do this first**: Metrics are meaningless without context. Looking at actual samples tells you whether clusters represent meaningful patterns (e.g., "successful logins" vs "failed logins") or arbitrary splits.
+
+**The approach**: For each cluster, display representative samples and their features.
+
+```{code-cell}
+def inspect_cluster_samples(embeddings, numerical, categorical, cluster_labels,
+                           artifacts, samples_per_cluster=3):
+    """
+    Display sample records from each cluster to understand semantic differences.
+
+    Args:
+        embeddings: Embedding vectors
+        numerical: Original numerical features
+        categorical: Original categorical features
+        cluster_labels: Cluster assignments from KMeans
+        artifacts: Feature artifacts with metadata
+        samples_per_cluster: Number of samples to show per cluster
+
+    Returns:
+        Dictionary of cluster samples
+    """
+    print("="*70)
+    print("CLUSTER CONTENT INSPECTION")
+    print("="*70)
+    print("\nExamining representative samples from each cluster to understand")
+    print("what distinguishes them semantically.\n")
+
+    unique_clusters = np.unique(cluster_labels)
+    cluster_samples = {}
+
+    for cluster_id in unique_clusters:
+        print(f"\n{'='*70}")
+        print(f"CLUSTER {cluster_id}")
+        print(f"{'='*70}")
+
+        # Get all samples in this cluster
+        cluster_mask = cluster_labels == cluster_id
+        cluster_size = cluster_mask.sum()
+        cluster_indices = np.where(cluster_mask)[0]
+
+        print(f"Cluster size: {cluster_size:,} samples ({100*cluster_size/len(embeddings):.1f}% of dataset)")
+
+        # Get cluster centroid for finding representative samples
+        cluster_embeddings = embeddings[cluster_mask]
+        centroid = cluster_embeddings.mean(axis=0)
+
+        # Find samples closest to centroid (most representative)
+        distances_to_centroid = np.linalg.norm(cluster_embeddings - centroid, axis=1)
+        representative_indices_local = np.argsort(distances_to_centroid)[:samples_per_cluster]
+        representative_indices = cluster_indices[representative_indices_local]
+
+        print(f"\nShowing {samples_per_cluster} representative samples (closest to cluster centroid):\n")
+
+        cluster_samples[cluster_id] = []
+
+        for i, sample_idx in enumerate(representative_indices, 1):
+            print(f"  Sample {i} (Index: {sample_idx})")
+            print(f"  {'-'*66}")
+
+            # Get features for this sample
+            num_feats = numerical[sample_idx]
+            cat_feats = categorical[sample_idx]
+
+            # Display numerical features (show first few or all if not too many)
+            print(f"  Numerical features ({len(num_feats)} features):")
+            # Show first 5 numerical features with their statistics
+            for feat_idx in range(min(5, len(num_feats))):
+                feat_val = num_feats[feat_idx]
+                print(f"    Feature {feat_idx}: {feat_val:.4f}")
+
+            # Display categorical features
+            print(f"  Categorical features ({len(cat_feats)} features):")
+            for feat_idx in range(min(5, len(cat_feats))):
+                cat_val = int(cat_feats[feat_idx])
+                print(f"    Feature {feat_idx}: {cat_val}")
+
+            # Display embedding norm (can indicate anomalies)
+            emb_norm = np.linalg.norm(embeddings[sample_idx])
+            print(f"  Embedding L2 norm: {emb_norm:.4f}")
+
+            cluster_samples[cluster_id].append({
+                'index': sample_idx,
+                'numerical': num_feats,
+                'categorical': cat_feats,
+                'embedding_norm': emb_norm
+            })
+
+            print()
+
+        # Show cluster statistics
+        print(f"  Cluster {cluster_id} Statistics:")
+        print(f"  {'-'*66}")
+
+        # Numerical feature statistics
+        cluster_numerical = numerical[cluster_mask]
+        print(f"  Numerical features (mean ± std for first 5):")
+        for feat_idx in range(min(5, numerical.shape[1])):
+            feat_mean = cluster_numerical[:, feat_idx].mean()
+            feat_std = cluster_numerical[:, feat_idx].std()
+            print(f"    Feature {feat_idx}: {feat_mean:.4f} ± {feat_std:.4f}")
+
+        # Categorical feature distributions
+        cluster_categorical = categorical[cluster_mask]
+        print(f"  Categorical features (mode for first 5):")
+        for feat_idx in range(min(5, categorical.shape[1])):
+            feat_values = cluster_categorical[:, feat_idx]
+            # Find most common value
+            unique_vals, counts = np.unique(feat_values, return_counts=True)
+            mode_idx = np.argmax(counts)
+            mode_val = int(unique_vals[mode_idx])
+            mode_pct = 100 * counts[mode_idx] / len(feat_values)
+            print(f"    Feature {feat_idx}: {mode_val} ({mode_pct:.1f}% of cluster)")
+
+        # Embedding norm statistics
+        cluster_norms = np.linalg.norm(embeddings[cluster_mask], axis=1)
+        print(f"  Embedding norms: {cluster_norms.mean():.4f} ± {cluster_norms.std():.4f}")
+        print(f"    Range: [{cluster_norms.min():.4f}, {cluster_norms.max():.4f}]")
+
+    print(f"\n{'='*70}")
+    print("INTERPRETATION GUIDE")
+    print(f"{'='*70}")
+    print("Look for patterns that distinguish clusters:")
+    print("  ✓ Different categorical features → clusters separate event types")
+    print("  ✓ Different numerical ranges → clusters separate by scale/volume")
+    print("  ✓ Different embedding norms → potential anomaly vs normal separation")
+    print("\nCompare samples across clusters to understand what the model learned!")
+
+    return cluster_samples
+
+# Inspect cluster contents
+cluster_samples = inspect_cluster_samples(
+    embeddings, numerical, categorical, cluster_labels, artifacts,
+    samples_per_cluster=3
+)
+```
+
+### Cluster Comparison Matrix
+
+Compare clusters side-by-side to highlight differences:
+
+```{code-cell}
+# Compare cluster characteristics side-by-side
+print("="*70)
+print("CLUSTER COMPARISON MATRIX")
+print("="*70)
+
+unique_clusters = np.unique(cluster_labels)
+
+print(f"\n{'Metric':<30}", end='')
+for cluster_id in unique_clusters:
+    print(f"Cluster {cluster_id:>10}", end='')
+print()
+print("-"*70)
+
+# Cluster sizes
+print(f"{'Size (samples)':<30}", end='')
+for cluster_id in unique_clusters:
+    cluster_size = (cluster_labels == cluster_id).sum()
+    print(f"{cluster_size:>10,}", end='')
+print()
+
+# Percentage of dataset
+print(f"{'Percentage':<30}", end='')
+for cluster_id in unique_clusters:
+    cluster_size = (cluster_labels == cluster_id).sum()
+    pct = 100 * cluster_size / len(embeddings)
+    print(f"{pct:>9.1f}%", end='')
+print()
+
+# Average embedding norm
+print(f"{'Avg Embedding Norm':<30}", end='')
+for cluster_id in unique_clusters:
+    cluster_mask = cluster_labels == cluster_id
+    avg_norm = np.linalg.norm(embeddings[cluster_mask], axis=1).mean()
+    print(f"{avg_norm:>10.4f}", end='')
+print()
+
+print()
+print("Now that we understand what the clusters contain, let's quantify their quality...")
+```
+
+**What to look for**:
+- **Different feature patterns**: Do clusters have distinct categorical values or numerical ranges?
+- **Semantic meaning**: Can you map clusters to event types (e.g., logins, file access, network activity)?
+- **Anomaly indicators**: Does one cluster have much higher/lower embedding norms?
+
+**Action if clusters don't make sense**: Revisit feature engineering (notebook 03) or try different values of k.
+
+---
+
+## 7. Quantifying Cluster Quality
+
+Now that we've seen what the clusters represent, let's measure their quality objectively.
+
+### Silhouette Score
+
+**What it measures**: How well-separated clusters are (range: -1 to +1, higher is better)
+
+**Target for production**: > 0.5
+
+```{code-cell}
 # Compute silhouette score
 silhouette_avg = silhouette_score(embeddings, cluster_labels)
 sample_silhouette_values = silhouette_samples(embeddings, cluster_labels)
@@ -341,8 +545,6 @@ elif silhouette_avg > 0.25:
     print(f"  ⚠ WEAK - May miss subtle anomalies")
 else:
     print(f"  ✗ POOR - Embeddings not useful, retrain needed")
-
-print(f"\nCluster sizes: {np.bincount(cluster_labels)}")
 ```
 
 ```{code-cell}
@@ -518,7 +720,7 @@ print("\nLook for the 'elbow' in the inertia plot where improvement slows down")
 
 ---
 
-## 7. Robustness Evaluation
+## 8. Robustness Evaluation
 
 Even with good cluster metrics, we need to ensure embeddings are robust to real-world noise and useful for downstream tasks.
 
@@ -648,7 +850,7 @@ knn_results = evaluate_knn_proxy(embeddings)
 
 ---
 
-## 8. Comprehensive Quality Report
+## 9. Comprehensive Quality Report
 
 Generate a summary report of all evaluation metrics.
 
@@ -749,7 +951,7 @@ else:
 
 ## Summary
 
-In this notebook, we evaluated embedding quality using a comprehensive four-phase approach:
+In this notebook, we evaluated embedding quality using a comprehensive approach:
 
 ### Phase 1: Qualitative Evaluation
 1. **t-SNE Visualization** - Projected embeddings to 2D preserving local structure
@@ -764,27 +966,39 @@ In this notebook, we evaluated embedding quality using a comprehensive four-phas
    - Spot-checked if neighbors make sense
    - Caught critical operational distinctions (success/failure)
 
-### Phase 2: Quantitative Evaluation
-4. **Cluster Quality Metrics** - Objective numbers
+### Phase 2: Understanding Clusters (New!)
+4. **Cluster Data** - Run k-means clustering
+
+5. **Inspect Cluster Contents** - Look at actual samples from each cluster
+   - Display representative samples and their features
+   - Understand what distinguishes clusters semantically
+   - **Key insight**: Do this BEFORE looking at metrics!
+
+6. **Cluster Comparison Matrix** - Compare clusters side-by-side
+   - Feature patterns, embedding norms, sizes
+
+### Phase 3: Quantitative Evaluation
+7. **Cluster Quality Metrics** - Now we can interpret the numbers!
    - **Silhouette Score**: Measures cluster separation (target > 0.5)
    - **Davies-Bouldin Index**: Measures cluster overlap (target < 1.0)
    - **Calinski-Harabasz Score**: Higher is better
+   - **Silhouette Plot**: Per-cluster quality visualization
 
-5. **Optimal Cluster Selection** - Finding the right k
+8. **Optimal Cluster Selection** - Finding the right k
    - Elbow method for inertia
    - Multi-metric agreement
 
-### Phase 3: Robustness Evaluation
-6. **Perturbation Stability** - Embeddings robust to noise
+### Phase 4: Robustness Evaluation
+9. **Perturbation Stability** - Embeddings robust to noise
    - Target > 0.92 similarity at 5% noise level
 
-7. **k-NN Classification** - Proxy task performance
-   - Target > 0.85 accuracy for production
+10. **k-NN Classification** - Proxy task performance
+    - Target > 0.85 accuracy for production
 
 ### Quality Report
-8. **Comprehensive Report** - Overall production readiness verdict
+11. **Comprehensive Report** - Overall production readiness verdict
 
-**Key Takeaway**: Embeddings must pass both quantitative thresholds AND qualitative inspection before production deployment.
+**Key Takeaway**: Always inspect cluster contents FIRST to understand what the model learned, THEN use quantitative metrics to measure quality. Embeddings must pass both semantic inspection AND quantitative thresholds before production deployment.
 
 **Next steps:**
 - ✓ If PASS: Proceed to [06-anomaly-detection.ipynb](06-anomaly-detection.ipynb)
