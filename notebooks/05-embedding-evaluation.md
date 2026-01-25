@@ -42,6 +42,7 @@ Numbers don't tell the whole story - you need to *look* at your data!
 
 ```{code-cell}
 import numpy as np
+import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
 import warnings
@@ -64,6 +65,7 @@ except ImportError:
 print("✓ All imports successful")
 print("\nLibraries loaded:")
 print("  - NumPy for numerical operations")
+print("  - Pandas for data manipulation")
 print("  - Matplotlib for visualization")
 print("  - Scikit-learn for clustering and metrics")
 print(f"  - UMAP: {'Available' if UMAP_AVAILABLE else 'Not installed (pip install umap-learn)'}")
@@ -93,6 +95,15 @@ categorical = np.load('../data/categorical_features.npy')
 with open('../data/feature_artifacts.pkl', 'rb') as f:
     artifacts = pickle.load(f)
 
+# Load original OCSF data for inspection
+ocsf_df = pd.read_parquet('../data/ocsf_logs.parquet')
+
+# Ensure OCSF data matches embeddings length
+if len(ocsf_df) != len(embeddings):
+    print(f"⚠ Warning: OCSF data has {len(ocsf_df)} rows but embeddings have {len(embeddings)}")
+    print(f"  Truncating to match...")
+    ocsf_df = ocsf_df.iloc[:len(embeddings)]
+
 print("Loaded Embeddings:")
 print(f"  Shape: {embeddings.shape}")
 print(f"  Mean: {embeddings.mean():.4f}")
@@ -100,6 +111,10 @@ print(f"  Std: {embeddings.std():.4f}")
 print(f"  Range: [{embeddings.min():.4f}, {embeddings.max():.4f}]")
 print(f"\n✓ No NaN values: {not np.isnan(embeddings).any()}")
 print(f"✓ No Inf values: {not np.isinf(embeddings).any()}")
+
+print(f"\nLoaded OCSF Data:")
+print(f"  Events: {len(ocsf_df):,}")
+print(f"  Columns: {len(ocsf_df.columns)}")
 ```
 
 ---
@@ -333,17 +348,14 @@ print(f"\nBefore looking at metrics, let's understand what these clusters contai
 **The approach**: For each cluster, display representative samples and their features.
 
 ```{code-cell}
-def inspect_cluster_samples(embeddings, numerical, categorical, cluster_labels,
-                           artifacts, samples_per_cluster=3):
+def inspect_cluster_samples(embeddings, ocsf_df, cluster_labels, samples_per_cluster=3):
     """
-    Display sample records from each cluster to understand semantic differences.
+    Display sample OCSF events from each cluster to understand semantic differences.
 
     Args:
         embeddings: Embedding vectors
-        numerical: Original numerical features
-        categorical: Original categorical features
+        ocsf_df: Original OCSF DataFrame
         cluster_labels: Cluster assignments from KMeans
-        artifacts: Feature artifacts with metadata
         samples_per_cluster: Number of samples to show per cluster
 
     Returns:
@@ -352,11 +364,24 @@ def inspect_cluster_samples(embeddings, numerical, categorical, cluster_labels,
     print("="*70)
     print("CLUSTER CONTENT INSPECTION")
     print("="*70)
-    print("\nExamining representative samples from each cluster to understand")
+    print("\nExamining representative OCSF events from each cluster to understand")
     print("what distinguishes them semantically.\n")
 
     unique_clusters = np.unique(cluster_labels)
     cluster_samples = {}
+
+    # Select key OCSF fields to display (adjust based on your data)
+    display_fields = [
+        'activity_id', 'class_uid', 'category_uid', 'severity_id',
+        'status', 'status_id', 'type_uid',
+        'actor_user_name', 'actor_process_name',
+        'http_request_method', 'http_response_code',
+        'src_endpoint_ip', 'dst_endpoint_ip',
+        'file_name', 'file_path',
+        'duration', 'time'
+    ]
+    # Filter to only fields that exist in the dataframe
+    display_fields = [f for f in display_fields if f in ocsf_df.columns]
 
     for cluster_id in unique_clusters:
         print(f"\n{'='*70}")
@@ -379,7 +404,7 @@ def inspect_cluster_samples(embeddings, numerical, categorical, cluster_labels,
         representative_indices_local = np.argsort(distances_to_centroid)[:samples_per_cluster]
         representative_indices = cluster_indices[representative_indices_local]
 
-        print(f"\nShowing {samples_per_cluster} representative samples (closest to cluster centroid):\n")
+        print(f"\nRepresentative OCSF events (closest to cluster centroid):\n")
 
         cluster_samples[cluster_id] = []
 
@@ -387,59 +412,56 @@ def inspect_cluster_samples(embeddings, numerical, categorical, cluster_labels,
             print(f"  Sample {i} (Index: {sample_idx})")
             print(f"  {'-'*66}")
 
-            # Get features for this sample
-            num_feats = numerical[sample_idx]
-            cat_feats = categorical[sample_idx]
+            # Get OCSF event data
+            event = ocsf_df.iloc[sample_idx]
 
-            # Display numerical features (show first few or all if not too many)
-            print(f"  Numerical features ({len(num_feats)} features):")
-            # Show first 5 numerical features with their statistics
-            for feat_idx in range(min(5, len(num_feats))):
-                feat_val = num_feats[feat_idx]
-                print(f"    Feature {feat_idx}: {feat_val:.4f}")
-
-            # Display categorical features
-            print(f"  Categorical features ({len(cat_feats)} features):")
-            for feat_idx in range(min(5, len(cat_feats))):
-                cat_val = int(cat_feats[feat_idx])
-                print(f"    Feature {feat_idx}: {cat_val}")
+            # Display key OCSF fields
+            for field in display_fields:
+                value = event[field]
+                # Handle NaN/None values
+                if pd.isna(value):
+                    continue
+                # Format value based on type
+                if isinstance(value, float):
+                    print(f"    {field}: {value:.4f}")
+                else:
+                    # Truncate long strings
+                    value_str = str(value)
+                    if len(value_str) > 50:
+                        value_str = value_str[:47] + "..."
+                    print(f"    {field}: {value_str}")
 
             # Display embedding norm (can indicate anomalies)
             emb_norm = np.linalg.norm(embeddings[sample_idx])
-            print(f"  Embedding L2 norm: {emb_norm:.4f}")
+            print(f"    [embedding_norm]: {emb_norm:.4f}")
 
             cluster_samples[cluster_id].append({
                 'index': sample_idx,
-                'numerical': num_feats,
-                'categorical': cat_feats,
+                'event': event.to_dict(),
                 'embedding_norm': emb_norm
             })
 
             print()
 
-        # Show cluster statistics
+        # Show cluster-level statistics for key fields
         print(f"  Cluster {cluster_id} Statistics:")
         print(f"  {'-'*66}")
 
-        # Numerical feature statistics
-        cluster_numerical = numerical[cluster_mask]
-        print(f"  Numerical features (mean ± std for first 5):")
-        for feat_idx in range(min(5, numerical.shape[1])):
-            feat_mean = cluster_numerical[:, feat_idx].mean()
-            feat_std = cluster_numerical[:, feat_idx].std()
-            print(f"    Feature {feat_idx}: {feat_mean:.4f} ± {feat_std:.4f}")
+        cluster_events = ocsf_df.iloc[cluster_indices]
 
-        # Categorical feature distributions
-        cluster_categorical = categorical[cluster_mask]
-        print(f"  Categorical features (mode for first 5):")
-        for feat_idx in range(min(5, categorical.shape[1])):
-            feat_values = cluster_categorical[:, feat_idx]
-            # Find most common value
-            unique_vals, counts = np.unique(feat_values, return_counts=True)
-            mode_idx = np.argmax(counts)
-            mode_val = int(unique_vals[mode_idx])
-            mode_pct = 100 * counts[mode_idx] / len(feat_values)
-            print(f"    Feature {feat_idx}: {mode_val} ({mode_pct:.1f}% of cluster)")
+        # Show most common values for categorical fields
+        cat_fields = ['activity_id', 'status', 'http_request_method']
+        cat_fields = [f for f in cat_fields if f in ocsf_df.columns]
+
+        if cat_fields:
+            print(f"  Most common values:")
+            for field in cat_fields:
+                if field in cluster_events.columns:
+                    value_counts = cluster_events[field].value_counts()
+                    if len(value_counts) > 0:
+                        top_value = value_counts.index[0]
+                        top_pct = 100 * value_counts.iloc[0] / len(cluster_events)
+                        print(f"    {field}: {top_value} ({top_pct:.1f}%)")
 
         # Embedding norm statistics
         cluster_norms = np.linalg.norm(embeddings[cluster_mask], axis=1)
@@ -450,8 +472,9 @@ def inspect_cluster_samples(embeddings, numerical, categorical, cluster_labels,
     print("INTERPRETATION GUIDE")
     print(f"{'='*70}")
     print("Look for patterns that distinguish clusters:")
-    print("  ✓ Different categorical features → clusters separate event types")
-    print("  ✓ Different numerical ranges → clusters separate by scale/volume")
+    print("  ✓ Different activity_id → clusters separate by action type")
+    print("  ✓ Different status → clusters separate success vs failure")
+    print("  ✓ Different actors/endpoints → clusters separate by entities")
     print("  ✓ Different embedding norms → potential anomaly vs normal separation")
     print("\nCompare samples across clusters to understand what the model learned!")
 
@@ -459,7 +482,7 @@ def inspect_cluster_samples(embeddings, numerical, categorical, cluster_labels,
 
 # Inspect cluster contents
 cluster_samples = inspect_cluster_samples(
-    embeddings, numerical, categorical, cluster_labels, artifacts,
+    embeddings, ocsf_df, cluster_labels,
     samples_per_cluster=3
 )
 ```
@@ -510,9 +533,16 @@ print("Now that we understand what the clusters contain, let's quantify their qu
 ```
 
 **What to look for**:
-- **Different feature patterns**: Do clusters have distinct categorical values or numerical ranges?
-- **Semantic meaning**: Can you map clusters to event types (e.g., logins, file access, network activity)?
+- **Event types**: Do clusters separate by `activity_id` (e.g., logins, file access, network activity)?
+- **Success/failure**: Do clusters separate by `status` or `status_id`?
+- **Actors and endpoints**: Do clusters group by users, processes, or IP addresses?
+- **HTTP patterns**: Do clusters separate by request methods or response codes?
 - **Anomaly indicators**: Does one cluster have much higher/lower embedding norms?
+
+**Real-world interpretation**:
+- If Cluster 0 is all "login success" and Cluster 1 is "login failure" → model learned operational status ✓
+- If Cluster 0 is "GET requests" and Cluster 1 is "POST requests" → model learned request types ✓
+- If clusters look random with mixed event types → revisit feature engineering ✗
 
 **Action if clusters don't make sense**: Revisit feature engineering (notebook 03) or try different values of k.
 
